@@ -8,19 +8,22 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        wire: {
-          dark: "#0a0c10",
-          card: "#12151c",
-          border: "#1f2430",
+        pulse: {
+          bg: "#090b10",
+          surface: "#11141c",
+          elevated: "#181d28",
+          border: "#232938",
           red: "#ef233c",
-          redGlow: "#d90429",
-          gray: "#8d99ae",
-          white: "#edf2f4"
+          crimson: "#d90429",
+          muted: "#94a3b8",
+          light: "#f8fafc",
+          accent: "#38bdf8"
         }
       },
       fontFamily: {
-        mono: ["JetBrains Mono", "monospace"],
-        sans: ["Inter", "sans-serif"]
+        sans: ["'Plus Jakarta Sans'", "system-ui", "sans-serif"],
+        editorial: ["'Newsreader'", "Georgia", "serif"],
+        mono: ["'JetBrains Mono'", "monospace"]
       }
     },
   },
