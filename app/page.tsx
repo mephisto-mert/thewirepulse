@@ -15,37 +15,41 @@ import {
   Clock,
   Bookmark,
   Share2,
+  ChevronLeft,
+  ChevronRight,
+  Flame,
+  Radio,
+  ArrowLeft,
+  Calendar,
   CheckCircle2,
-  Sparkles,
-  ArrowRight,
-  X,
-  Send,
-  Zap,
-  BookOpen
+  Eye,
+  Bell
 } from "lucide-react";
 
 const CATEGORIES = [
-  { label: "All Dispatches", icon: Globe2, value: "ALL" },
-  { label: "War & Defense", icon: ShieldAlert, value: "WAR & DEFENSE" },
-  { label: "AI & Innovation", icon: Cpu, value: "AI & TECH" },
-  { label: "Markets & Economy", icon: TrendingUp, value: "MARKETS" },
-  { label: "World Politics", icon: Landmark, value: "POLITICS" },
-  { label: "Global Affairs", icon: Globe2, value: "WORLD AFFAIRS" },
+  { label: "TÜM HABERLER", en: "ALL", icon: Flame },
+  { label: "DÜNYA & GÜNDEM", en: "WORLD AFFAIRS", icon: Globe2 },
+  { label: "SAVUNMA & ÇATIŞMA", en: "WAR & DEFENSE", icon: ShieldAlert },
+  { label: "EKONOMİ & PİYASALAR", en: "MARKETS", icon: TrendingUp },
+  { label: "TEKNOLOJİ & AI", en: "AI & TECH", icon: Cpu },
+  { label: "POLİTİKA & DİPLOMASİ", en: "POLITICS", icon: Landmark }
 ];
 
-export default function ModernPulsePage() {
+export default function SonDakikaPulsePage() {
   const [articles, setArticles] = useState<WireArticle[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState<string>("");
-  const [activeArticle, setActiveArticle] = useState<WireArticle | null>(null);
+  const [currentMansetIndex, setCurrentMansetIndex] = useState<number>(0);
+  const [readingArticle, setReadingArticle] = useState<WireArticle | null>(null);
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
   const [toastMessage, setToastMessage] = useState<string>("");
   const [currentTime, setCurrentTime] = useState<string>("");
+  const [isAutoPlay, setIsAutoPlay] = useState<boolean>(true);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
-    setTimeout(() => setToastMessage(""), 3000);
+    setTimeout(() => setToastMessage(""), 2800);
   };
 
   const toggleBookmark = (id: string, e: React.MouseEvent) => {
@@ -54,10 +58,10 @@ export default function ModernPulsePage() {
       const next = new Set(prev);
       if (next.has(id)) {
         next.delete(id);
-        showToast("Removed from saved reading list");
+        showToast("Haber okuma listesinden kaldırıldı.");
       } else {
         next.add(id);
-        showToast("Saved to your reading list");
+        showToast("Haber okuma listenize kaydedildi!");
       }
       return next;
     });
@@ -65,9 +69,9 @@ export default function ModernPulsePage() {
 
   const shareArticle = (art: WireArticle, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (navigator.clipboard) {
+    if (typeof window !== "undefined" && navigator.clipboard) {
       navigator.clipboard.writeText(art.url);
-      showToast("Article dispatch link copied to clipboard!");
+      showToast("Haber bağlantısı panoya kopyalandı!");
     }
   };
 
@@ -76,11 +80,11 @@ export default function ModernPulsePage() {
       setLoading(true);
       const res = await fetch("/api/news");
       const data = await res.json();
-      if (data.success && data.articles) {
+      if (data.success && data.articles && data.articles.length > 0) {
         setArticles(data.articles);
       }
     } catch (e) {
-      console.error("Failed to fetch wire reports:", e);
+      console.error("Haberler çekilirken hata oluştu:", e);
     } finally {
       setLoading(false);
     }
@@ -88,537 +92,727 @@ export default function ModernPulsePage() {
 
   useEffect(() => {
     fetchNews();
-    const interval = setInterval(fetchNews, 60000); // 60s background revalidation
+    const interval = setInterval(fetchNews, 60000); // 60s otomatik canlı ajans güncellemesi
     return () => clearInterval(interval);
   }, []);
 
+  // Canlı Saat
   useEffect(() => {
-    const clockInterval = setInterval(() => {
+    const updateTime = () => {
       const now = new Date();
-      setCurrentTime(
-        now.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }) +
-        " • " +
-        now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false }) + " UTC"
-      );
-    }, 1000);
+      const options: Intl.DateTimeFormatOptions = { 
+        weekday: "long", 
+        year: "numeric", 
+        month: "long", 
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit"
+      };
+      setCurrentTime(now.toLocaleDateString("tr-TR", options));
+    };
+    updateTime();
+    const clockInterval = setInterval(updateTime, 1000);
     return () => clearInterval(clockInterval);
   }, []);
 
+  // Filtered articles
   const filteredArticles = useMemo(() => {
-    return articles.filter((art) => {
-      const matchCat = selectedCategory === "ALL" || art.category === selectedCategory;
-      const matchSearch =
-        searchQuery === "" ||
-        art.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        art.summary.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        art.source.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        art.desk.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchCat && matchSearch;
-    });
+    let result = articles;
+    if (selectedCategory !== "ALL") {
+      result = result.filter((a) => a.category === selectedCategory);
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(
+        (a) => a.title.toLowerCase().includes(q) || a.summary.toLowerCase().includes(q)
+      );
+    }
+    return result;
   }, [articles, selectedCategory, searchQuery]);
 
-  const leadStory = filteredArticles[0];
-  const secondaryStories = filteredArticles.slice(1, 4);
-  const feedStories = filteredArticles.slice(4);
+  // Manşet listesi (Top 10)
+  const mansetList = useMemo(() => {
+    return articles.slice(0, 10);
+  }, [articles]);
+
+  useEffect(() => {
+    if (readingArticle) {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }, [readingArticle]);
+
+  // Manşet Otomatik Döngü
+
+  useEffect(() => {
+    if (!isAutoPlay || mansetList.length === 0 || readingArticle) return;
+    const timer = setInterval(() => {
+      setCurrentMansetIndex((prev) => (prev + 1) % mansetList.length);
+    }, 6000);
+    return () => clearInterval(timer);
+  }, [isAutoPlay, mansetList.length, readingArticle]);
+
+  // Son dakika akışı (Chronological wire for right column)
+  const sonDakikaAkisi = useMemo(() => {
+    return articles.slice(0, 18);
+  }, [articles]);
+
+  // Sürmanşetler (4 adet)
+  const surmansetler = useMemo(() => {
+    return articles.slice(10, 14);
+  }, [articles]);
+
+  // Kategori blokları
+  const dunyaHaberleri = useMemo(() => {
+    return articles.filter(a => a.category === "WORLD AFFAIRS" || a.category === "POLITICS").slice(0, 4);
+  }, [articles]);
+
+  const ekonomiHaberleri = useMemo(() => {
+    return articles.filter(a => a.category === "MARKETS").slice(0, 4);
+  }, [articles]);
+
+  const savunmaHaberleri = useMemo(() => {
+    return articles.filter(a => a.category === "WAR & DEFENSE").slice(0, 4);
+  }, [articles]);
+
+  const activeManset = mansetList[currentMansetIndex] || articles[0];
 
   return (
-    <div className="flex flex-col min-h-screen text-slate-100">
+    <div className="min-h-screen bg-[#0d0f15] text-[#f1f5f9] flex flex-col antialiased selection:bg-red-600 selection:text-white">
       {/* Toast Alert */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 bg-[#1e2433] text-white text-xs px-4 py-3 rounded-xl border border-white/10 shadow-2xl flex items-center gap-2 animate-bounce">
-          <CheckCircle2 className="w-4 h-4 text-[#ef233c]" />
+        <div className="fixed bottom-6 right-6 z-50 bg-red-600 text-white font-medium px-5 py-3 rounded-lg shadow-2xl shadow-red-900/50 flex items-center space-x-2 border border-red-400">
+          <CheckCircle2 className="w-5 h-5 text-white" />
           <span>{toastMessage}</span>
         </div>
       )}
 
-      {/* Top Editorial Ticker & Market Pulse */}
-      <div className="border-b border-white/[0.06] bg-[#0c0e14] py-2 px-4 sm:px-8 text-xs text-slate-400">
-        <div className="max-w-7xl mx-auto flex flex-wrap justify-between items-center gap-3">
-          <div className="flex items-center gap-4">
-            <span className="flex items-center gap-2 text-rose-500 font-semibold tracking-wide uppercase font-mono text-[11px]">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-500 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
-              </span>
-              Live Wire
+      {/* TOPBAR: Canlı Finans & Saat & Sosyal */}
+      <div className="bg-[#08090d] border-b border-gray-800 text-xs font-mono text-gray-400 py-1.5 px-4 sm:px-8">
+        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center space-x-4">
+            <span className="flex items-center text-red-500 font-bold tracking-wider">
+              <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse-fast mr-1.5"></span>
+              CANLI YAYIN
             </span>
-            <span className="text-white/20 hidden sm:inline">|</span>
-            <span className="hidden md:inline font-mono text-[11px] text-slate-400">
-              Verified Correspondents: London • Washington • Paris • Tokyo • Berlin
+            <span className="hidden md:inline-block text-gray-400">
+              <Calendar className="w-3.5 h-3.5 inline mr-1 text-gray-500" />
+              {currentTime || "9 Kasım 2026 Pazartesi"}
             </span>
           </div>
 
-          <div className="flex items-center gap-4 font-mono text-[11px]">
-            <div className="hidden lg:flex items-center gap-3 text-slate-400">
-              <span>BRENT <strong className="text-emerald-400">$74.20</strong></span>
-              <span>•</span>
-              <span>GOLD <strong className="text-amber-400">$2,740</strong></span>
-              <span>•</span>
-              <span>BTC <strong className="text-emerald-400">$91.4K</strong></span>
-            </div>
-            <span className="text-white/20 hidden lg:inline">|</span>
-            <span>{currentTime || "GLOBAL DISPATCH"}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Masthead Header */}
-      <header className="border-b border-white/[0.08] bg-[#090b10]/90 backdrop-blur-xl sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-8 py-5 flex flex-col md:flex-row justify-between items-center gap-4">
-          <div className="flex items-center gap-4">
-            <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-[#1b202e] to-[#0f121a] border border-rose-500/30 flex items-center justify-center text-rose-500 font-black text-xl shadow-lg shadow-rose-500/10">
-              <Zap className="w-5 h-5 text-rose-500 fill-rose-500" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2.5">
-                <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white font-sans">
-                  THE WIRE PULSE
-                </h1>
-                <span className="hidden sm:inline-block px-2.5 py-0.5 rounded-full text-[10px] font-mono font-medium tracking-wider uppercase bg-rose-500/10 text-rose-400 border border-rose-500/20">
-                  Global Wire
-                </span>
-              </div>
-              <p className="text-xs text-slate-400 tracking-wider font-light mt-0.5">
-                Real-time world intelligence, verified by international correspondents.
-              </p>
-            </div>
+          {/* Piyasa Bant Göstergeleri */}
+          <div className="hidden lg:flex items-center space-x-5 text-gray-300">
+            <span className="hover:text-white transition">USD/TRY: <b className="text-emerald-400">35.84 ▲</b></span>
+            <span className="hover:text-white transition">EUR/TRY: <b className="text-emerald-400">38.62 ▲</b></span>
+            <span className="hover:text-white transition">ALTIN: <b className="text-amber-400">3.125 TL ▲</b></span>
+            <span className="hover:text-white transition">BRENT: <b className="text-rose-400">74.2$ ▼</b></span>
+            <span className="hover:text-white transition">BITCOIN: <b className="text-emerald-400">$91,420 ▲</b></span>
           </div>
 
-          <div className="flex items-center gap-3 w-full md:w-auto">
-            {/* Live Search */}
-            <div className="relative flex-1 md:w-64">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                placeholder="Search reports or topics..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-[#131722] border border-white/[0.08] rounded-xl pl-10 pr-4 py-2 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-rose-500/60 transition-all"
-              />
-            </div>
-
-            {/* Instagram Follow */}
+          <div className="flex items-center space-x-3">
             <a
               href="https://www.instagram.com/thewirepulse/"
               target="_blank"
               rel="noreferrer"
-              className="flex items-center gap-2 bg-gradient-to-r from-rose-600 to-rose-500 text-white text-xs font-semibold px-4 py-2 rounded-xl hover:brightness-110 transition-all shadow-md shadow-rose-600/20 shrink-0"
+              className="flex items-center space-x-1.5 text-gray-300 hover:text-white bg-gradient-to-r from-pink-600/30 to-purple-600/30 hover:from-pink-600/50 hover:to-purple-600/50 border border-pink-500/40 px-2.5 py-0.5 rounded transition text-[11px]"
             >
-              <Instagram className="w-4 h-4" />
-              <span className="hidden sm:inline">Follow on Instagram</span>
-              <span className="sm:hidden">IG</span>
+              <Instagram className="w-3.5 h-3.5 text-pink-400" />
+              <span>@thewirepulse</span>
             </a>
           </div>
         </div>
+      </div>
 
-        {/* Elegant Category Pills */}
-        <div className="border-t border-white/[0.06] bg-[#0c0f16]/60 overflow-x-auto no-scrollbar">
-          <div className="max-w-7xl mx-auto px-4 sm:px-8 flex items-center justify-between gap-4 py-2.5">
-            <div className="flex items-center gap-1.5 shrink-0">
-              {CATEGORIES.map((cat) => {
-                const Icon = cat.icon;
-                const isActive = selectedCategory === cat.value;
-                return (
-                  <button
-                    key={cat.value}
-                    onClick={() => setSelectedCategory(cat.value)}
-                    className={`flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-medium transition-all ${
-                      isActive
-                        ? "bg-white text-slate-950 font-semibold shadow-md shadow-white/10"
-                        : "text-slate-400 hover:text-white hover:bg-white/[0.04]"
-                    }`}
-                  >
-                    <Icon className="w-3.5 h-3.5" />
-                    {cat.label}
-                  </button>
-                );
-              })}
-            </div>
-
-            <button
-              onClick={fetchNews}
-              className="text-xs text-slate-400 hover:text-white flex items-center gap-1.5 shrink-0 font-mono"
-              title="Refresh feed"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin text-rose-500" : ""}`} />
-              <span className="hidden lg:inline">Live Sync</span>
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content Showcase */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-8 py-8 flex-1 w-full space-y-10">
-        {loading && articles.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-28 gap-4 text-slate-400">
-            <RefreshCw className="w-9 h-9 animate-spin text-rose-500" />
-            <p className="text-sm font-medium tracking-wide">Connecting to international wire networks...</p>
-          </div>
-        ) : filteredArticles.length === 0 ? (
-          <div className="text-center py-24 text-slate-400 glass-panel rounded-3xl p-12">
-            <Globe2 className="w-12 h-12 mx-auto mb-3 text-slate-500" />
-            <p className="text-lg font-semibold text-white">No reports match your current filter.</p>
-            <p className="text-sm mt-1 text-slate-400">Try clearing the search query or selecting another category.</p>
-          </div>
-        ) : (
-          <>
-            {/* HERO & SECONDARY ASYMMETRICAL EDITORIAL GRID */}
-            <section className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-              {/* PRIMARY LEAD STORY (7 cols) */}
-              {leadStory && (
-                <div 
-                  onClick={() => setActiveArticle(leadStory)}
-                  className="lg:col-span-7 bg-[#11141d] border border-white/[0.08] rounded-3xl overflow-hidden shadow-2xl hover:border-rose-500/40 transition-all duration-300 group cursor-pointer flex flex-col justify-between"
-                >
-                  <div className="relative h-80 sm:h-96 w-full overflow-hidden bg-black">
-                    <img
-                      src={leadStory.imageUrl}
-                      alt={leadStory.title}
-                      className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700 opacity-90"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#11141d] via-[#11141d]/20 to-transparent" />
-                    
-                    <div className="absolute top-5 left-5 flex gap-2">
-                      <span className="px-3 py-1 rounded-full bg-rose-600 text-white text-[11px] font-semibold tracking-wide uppercase shadow-lg shadow-rose-600/30">
-                        {leadStory.category}
-                      </span>
-                      <span className="px-3 py-1 rounded-full bg-black/70 backdrop-blur-md text-slate-300 text-[11px] border border-white/10 font-mono">
-                        {leadStory.desk}
-                      </span>
-                    </div>
-
-                    <div className="absolute bottom-5 right-5 flex items-center gap-2">
-                      <button
-                        onClick={(e) => toggleBookmark(leadStory.id, e)}
-                        className={`p-2.5 rounded-full backdrop-blur-md border transition-all ${
-                          savedIds.has(leadStory.id)
-                            ? "bg-rose-600 text-white border-rose-500"
-                            : "bg-black/60 text-slate-300 border-white/10 hover:text-white"
-                        }`}
-                        title="Save for later"
-                      >
-                        <Bookmark className="w-4 h-4 fill-current" />
-                      </button>
-                      <button
-                        onClick={(e) => shareArticle(leadStory, e)}
-                        className="p-2.5 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-slate-300 hover:text-white transition-all"
-                        title="Share report"
-                      >
-                        <Share2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="p-7 sm:p-9 space-y-4">
-                    <div className="flex items-center gap-2.5 text-xs text-slate-400 font-mono">
-                      <Clock className="w-3.5 h-3.5 text-rose-500" />
-                      <span>{leadStory.timeAgo}</span>
-                      <span>•</span>
-                      <span>{leadStory.readTime}</span>
-                      <span>•</span>
-                      <span className="text-emerald-400 font-medium">{leadStory.source}</span>
-                    </div>
-
-                    <h2 className="text-2xl sm:text-3xl lg:text-4xl font-editorial font-bold text-white leading-tight group-hover:text-rose-400 transition-colors">
-                      {leadStory.title}
-                    </h2>
-
-                    <p className="text-slate-300 text-base leading-relaxed font-light">
-                      {leadStory.summary}
-                    </p>
-
-                    <div className="pt-5 border-t border-white/[0.06] flex items-center justify-between">
-                      <span className="text-xs text-rose-400 font-semibold flex items-center gap-1.5 group-hover:translate-x-1 transition-transform">
-                        Read Correspondent Briefing <ArrowRight className="w-4 h-4" />
-                      </span>
-                      <span className="text-xs text-slate-500 font-mono">
-                        Published {new Date(leadStory.publishedAt).toLocaleDateString()}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* SECONDARY STORIES (5 cols) */}
-              <div className="lg:col-span-5 space-y-4">
-                <div className="flex items-center justify-between pb-1">
-                  <h3 className="text-xs font-mono font-bold tracking-wider text-slate-400 uppercase flex items-center gap-2">
-                    <Sparkles className="w-3.5 h-3.5 text-rose-500" />
-                    DEVELOPING STORIES
-                  </h3>
-                  <span className="text-xs text-slate-500 font-mono">Latest Hours</span>
-                </div>
-
-                <div className="space-y-4">
-                  {secondaryStories.map((art) => (
-                    <article
-                      key={art.id}
-                      onClick={() => setActiveArticle(art)}
-                      className="bg-[#11141d] border border-white/[0.06] rounded-2xl p-4 sm:p-5 hover:border-white/20 transition-all duration-300 cursor-pointer group flex gap-4 items-center"
-                    >
-                      <div className="relative w-28 h-24 sm:w-32 sm:h-28 rounded-xl overflow-hidden shrink-0 bg-black">
-                        <img
-                          src={art.imageUrl}
-                          alt={art.title}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                          loading="lazy"
-                        />
-                        <span className="absolute top-2 left-2 px-2 py-0.5 rounded-md bg-black/75 backdrop-blur-md text-white text-[9px] font-mono">
-                          {art.category.split(" ")[0]}
-                        </span>
-                      </div>
-
-                      <div className="flex-1 space-y-1.5 min-w-0">
-                        <div className="flex items-center gap-2 text-[11px] text-slate-400 font-mono">
-                          <span>{art.timeAgo}</span>
-                          <span>•</span>
-                          <span className="text-slate-500 truncate">{art.source}</span>
-                        </div>
-
-                        <h4 className="text-sm sm:text-base font-semibold text-white leading-snug group-hover:text-rose-400 transition-colors line-clamp-2">
-                          {art.title}
-                        </h4>
-
-                        <p className="text-xs text-slate-400 line-clamp-1 font-light">
-                          {art.summary}
-                        </p>
-                      </div>
-                    </article>
-                  ))}
-                </div>
-
-                {/* Newsletter / Wire Brief Box */}
-                <div className="p-6 rounded-2xl bg-gradient-to-br from-rose-950/20 via-[#131722] to-[#11141d] border border-rose-500/20 space-y-3 mt-4">
-                  <div className="flex items-center gap-2 text-rose-400 font-semibold text-xs uppercase tracking-wider font-mono">
-                    <Send className="w-3.5 h-3.5" />
-                    The 60-Second Wire Brief
-                  </div>
-                  <h4 className="text-base font-bold text-white">
-                    Direct Intelligence in Your Pocket
-                  </h4>
-                  <p className="text-xs text-slate-300 leading-relaxed font-light">
-                    Follow @thewirepulse on Instagram for rapid breaking coverage and visual analysis.
-                  </p>
-                  <a
-                    href="https://www.instagram.com/thewirepulse/"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-2 text-xs font-semibold bg-rose-600 hover:bg-rose-500 text-white px-4 py-2 rounded-xl transition-all shadow-md shadow-rose-600/20"
-                  >
-                    Follow @thewirepulse <ExternalLink className="w-3.5 h-3.5" />
-                  </a>
-                </div>
-              </div>
-            </section>
-
-            {/* FULL WIRE FEED GRID */}
-            <section className="space-y-6 pt-6">
-              <div className="flex items-center justify-between border-b border-white/[0.08] pb-4">
-                <div>
-                  <h3 className="text-xl font-bold text-white tracking-tight font-sans">
-                    Chronological Wire Stream
-                  </h3>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    Continuous reporting stream across international desks ({filteredArticles.length} dispatches)
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-2 text-xs text-slate-400 font-mono">
-                  <BookOpen className="w-3.5 h-3.5 text-rose-500" />
-                  <span>Curated Feed</span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {feedStories.map((art) => (
-                  <article
-                    key={art.id}
-                    onClick={() => setActiveArticle(art)}
-                    className="bg-[#11141d] border border-white/[0.06] rounded-2xl overflow-hidden hover:border-white/20 hover:-translate-y-1 transition-all duration-300 cursor-pointer flex flex-col justify-between group shadow-xl"
-                  >
-                    <div>
-                      <div className="relative h-48 w-full bg-black overflow-hidden">
-                        <img
-                          src={art.imageUrl}
-                          alt={art.title}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 opacity-90"
-                          loading="lazy"
-                        />
-                        <div className="absolute top-3 left-3 flex gap-1.5">
-                          <span className="px-2.5 py-0.5 rounded-full bg-rose-600 text-white text-[10px] font-semibold uppercase tracking-wider">
-                            {art.category}
-                          </span>
-                        </div>
-                        <div className="absolute bottom-3 right-3">
-                          <span className="px-2 py-0.5 rounded-md bg-black/80 backdrop-blur-md text-slate-300 text-[10px] font-mono">
-                            {art.source}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="p-5 space-y-2.5">
-                        <div className="flex items-center justify-between text-[11px] text-slate-400 font-mono">
-                          <div className="flex items-center gap-1.5">
-                            <Clock className="w-3 h-3 text-rose-500" />
-                            <span>{art.timeAgo}</span>
-                          </div>
-                          <span>{art.readTime}</span>
-                        </div>
-
-                        <h4 className="text-base font-bold text-white leading-snug group-hover:text-rose-400 transition-colors line-clamp-2">
-                          {art.title}
-                        </h4>
-
-                        <p className="text-xs text-slate-400 line-clamp-3 leading-relaxed font-light">
-                          {art.summary}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="p-5 pt-0 border-t border-white/[0.04] mt-4 flex items-center justify-between text-xs text-slate-400">
-                      <span className="font-mono text-[11px] text-slate-500">{art.desk}</span>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={(e) => toggleBookmark(art.id, e)}
-                          className={`p-1.5 rounded-lg transition-colors ${
-                            savedIds.has(art.id) ? "text-rose-500" : "hover:text-white"
-                          }`}
-                          title="Bookmark"
-                        >
-                          <Bookmark className="w-3.5 h-3.5 fill-current" />
-                        </button>
-                        <button
-                          onClick={(e) => shareArticle(art, e)}
-                          className="p-1.5 rounded-lg hover:text-white transition-colors"
-                          title="Share"
-                        >
-                          <Share2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            </section>
-          </>
-        )}
-      </main>
-
-      {/* ARTICLE READER MODAL (Human Interactive Drawer) */}
-      {activeArticle && (
-        <div 
-          onClick={() => setActiveArticle(null)}
-          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6 overflow-y-auto"
-        >
-          <div 
-            onClick={(e) => e.stopPropagation()}
-            className="bg-[#11141d] border border-white/10 rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl relative flex flex-col"
-          >
-            {/* Modal Header Image */}
-            <div className="relative h-64 sm:h-80 w-full overflow-hidden bg-black shrink-0">
-              <img
-                src={activeArticle.imageUrl}
-                alt={activeArticle.title}
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-[#11141d] via-[#11141d]/30 to-transparent" />
-              
-              <button
-                onClick={() => setActiveArticle(null)}
-                className="absolute top-4 right-4 p-2 rounded-full bg-black/70 backdrop-blur-md text-white hover:bg-rose-600 transition-colors border border-white/10"
+      {/* HEADER: Logo & Slogan & Arama */}
+      <header className="bg-[#121620] border-b border-gray-800 sticky top-0 z-40 shadow-xl">
+        <div className="max-w-7xl mx-auto px-4 sm:px-8 py-3.5">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+            {/* Logo */}
+            <div className="flex items-center justify-between">
+              <button 
+                onClick={() => { setReadingArticle(null); setSelectedCategory("ALL"); }}
+                className="text-left group flex items-center space-x-3"
               >
-                <X className="w-5 h-5" />
+                <div className="w-10 h-10 rounded bg-red-600 flex items-center justify-center font-black text-xl text-white shadow-lg shadow-red-600/30 group-hover:scale-105 transition">
+                  WP
+                </div>
+                <div>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-2xl font-black tracking-tight text-white uppercase group-hover:text-red-500 transition">
+                      THE WIRE PULSE
+                    </span>
+                    <span className="bg-red-600 text-white font-extrabold text-[10px] px-2 py-0.5 rounded tracking-widest uppercase animate-pulse-fast">
+                      SON DAKİKA
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-400 font-medium">
+                    Küresel 7/24 Anlık Ajans Haberleri & Canlı İstihbarat Portalı
+                  </p>
+                </div>
               </button>
 
-              <div className="absolute bottom-4 left-6 flex items-center gap-2">
-                <span className="px-3 py-1 rounded-full bg-rose-600 text-white text-xs font-semibold uppercase">
-                  {activeArticle.category}
-                </span>
-                <span className="px-3 py-1 rounded-full bg-black/70 backdrop-blur-md text-slate-300 text-xs font-mono">
-                  {activeArticle.desk}
-                </span>
+              <button
+                onClick={fetchNews}
+                disabled={loading}
+                className="md:hidden p-2 text-gray-400 hover:text-white bg-gray-800/80 rounded"
+                title="Yenile"
+              >
+                <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin text-red-500" : ""}`} />
+              </button>
+            </div>
+
+            {/* Arama & Yenile Butonu */}
+            <div className="flex items-center space-x-3 w-full md:w-auto">
+              <div className="relative flex-1 md:w-72">
+                <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Son dakika haberlerinde ara..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full bg-[#1a202c] border border-gray-700/80 focus:border-red-500 focus:ring-1 focus:ring-red-500 text-sm text-white pl-9 pr-3 py-2 rounded outline-none transition placeholder-gray-500"
+                />
+                {searchQuery && (
+                  <button 
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white text-xs bg-gray-700 rounded-full w-4 h-4 flex items-center justify-center"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+
+              <button
+                onClick={fetchNews}
+                disabled={loading}
+                className="hidden md:flex items-center space-x-1.5 text-xs font-semibold bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-700 px-3 py-2 rounded transition active:scale-95"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 text-red-500 ${loading ? "animate-spin" : ""}`} />
+                <span>{loading ? "Taranıyor..." : "Canlı Yenile"}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* KIRMIZI SON DAKİKA KAYAN YAZI BANDI (Breaking News Ticker) */}
+        <div className="bg-[#b91c1c] text-white overflow-hidden py-1 px-4 flex items-center shadow-inner">
+          <div className="flex items-center bg-black/30 font-black text-xs px-2.5 py-0.5 rounded mr-3 tracking-wider shrink-0 uppercase">
+            <Radio className="w-3.5 h-3.5 mr-1 text-white animate-pulse-fast" />
+            FLAŞ HABER
+          </div>
+          <div className="relative w-full overflow-hidden whitespace-nowrap">
+            <div className="animate-marquee flex items-center space-x-10 text-xs font-medium">
+              {articles.slice(0, 10).map((art, idx) => (
+                <button
+                  key={`marquee-${art.id}-${idx}`}
+                  onClick={() => setReadingArticle(art)}
+                  className="hover:underline flex items-center space-x-2 text-white/95"
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-white/70"></span>
+                  <span className="font-bold">[{art.source}]:</span>
+                  <span>{art.title}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* KATEGORİ MENÜSÜ (Haber Portalı Sekmeleri) */}
+        <nav className="bg-[#0b0e14] border-t border-b border-gray-800/80 px-4 sm:px-8">
+          <div className="max-w-7xl mx-auto flex items-center overflow-x-auto space-x-1 py-1.5 no-scrollbar">
+            {CATEGORIES.map((cat) => {
+              const Icon = cat.icon;
+              const isActive = selectedCategory === cat.en;
+              return (
+                <button
+                  key={cat.en}
+                  onClick={() => {
+                    setSelectedCategory(cat.en);
+                    setReadingArticle(null);
+                  }}
+                  className={`flex items-center space-x-1.5 px-3 py-1.5 rounded text-xs font-bold transition whitespace-nowrap uppercase tracking-wide ${
+                    isActive
+                      ? "bg-red-600 text-white shadow-md shadow-red-600/30"
+                      : "text-gray-400 hover:text-white hover:bg-gray-800/60"
+                  }`}
+                >
+                  <Icon className={`w-3.5 h-3.5 ${isActive ? "text-white" : "text-red-500"}`} />
+                  <span>{cat.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </nav>
+      </header>
+
+      {/* ANA İÇERİK ALANI */}
+      <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-8 py-6">
+        {/* ========================================================
+            DEDICATED FULL ARTICLE READING VIEW (NO POPUP MODAL!)
+        ======================================================== */}
+        {readingArticle ? (
+          <div className="bg-[#131722] border border-gray-800 rounded-xl p-6 sm:p-10 shadow-2xl max-w-4xl mx-auto animate-fadeIn">
+            {/* Geri Dön Butonu & Üst Eylemler */}
+            <div className="flex items-center justify-between pb-6 mb-6 border-b border-gray-800">
+              <button
+                onClick={() => setReadingArticle(null)}
+                className="flex items-center space-x-2 text-sm font-bold text-gray-300 hover:text-white bg-gray-800 hover:bg-red-600 px-4 py-2 rounded-lg transition"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>Son Dakika Akışına Dön</span>
+              </button>
+
+              <div className="flex items-center space-x-3">
+                <button
+                  onClick={(e) => toggleBookmark(readingArticle.id, e)}
+                  className={`p-2.5 rounded-lg border text-sm transition ${
+                    savedIds.has(readingArticle.id)
+                      ? "bg-amber-500/20 text-amber-400 border-amber-500/40"
+                      : "bg-gray-800 text-gray-400 border-gray-700 hover:text-white"
+                  }`}
+                  title="Haberi Kaydet"
+                >
+                  <Bookmark className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={(e) => shareArticle(readingArticle, e)}
+                  className="p-2.5 rounded-lg bg-gray-800 text-gray-400 border border-gray-700 hover:text-white transition"
+                  title="Paylaş"
+                >
+                  <Share2 className="w-4 h-4" />
+                </button>
               </div>
             </div>
 
-            {/* Modal Body Content */}
-            <div className="p-6 sm:p-8 space-y-5">
-              <div className="flex items-center gap-3 text-xs text-slate-400 font-mono">
-                <span className="text-emerald-400 font-medium">Source: {activeArticle.source}</span>
-                <span>•</span>
-                <span>{activeArticle.timeAgo}</span>
-                <span>•</span>
-                <span>{activeArticle.readTime}</span>
+            {/* Kategori & Tarih Bilgisi */}
+            <div className="flex flex-wrap items-center gap-3 text-xs text-gray-400 mb-4 font-mono">
+              <span className="bg-red-600 text-white font-bold px-2.5 py-1 rounded uppercase tracking-wider">
+                {readingArticle.category}
+              </span>
+              <span className="text-gray-300 font-semibold">Kaynak: {readingArticle.source}</span>
+              <span>•</span>
+              <span className="flex items-center">
+                <Clock className="w-3.5 h-3.5 mr-1 text-red-500" />
+                {readingArticle.timeAgo}
+              </span>
+              <span>•</span>
+              <span>Okunma Süresi: {readingArticle.readTime}</span>
+            </div>
+
+            {/* Büyük Haber Başlığı */}
+            <h1 className="text-2xl sm:text-4xl font-extrabold text-white leading-tight mb-6">
+              {readingArticle.title}
+            </h1>
+
+            {/* Büyük Manşet Görseli */}
+            <div className="relative aspect-video w-full rounded-xl overflow-hidden mb-8 border border-gray-800 shadow-2xl bg-black">
+              <img
+                src={readingArticle.imageUrl}
+                alt={readingArticle.title}
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent p-4 text-xs text-gray-300">
+                <span>Fotoğraf: {readingArticle.desk} Arşivi / Uluslararası Haber Ajansı Dağıtımı</span>
+              </div>
+            </div>
+
+            {/* Haber Metni & Detayları */}
+            <div className="space-y-6 text-gray-200 text-base sm:text-lg leading-relaxed">
+              <div className="p-4 bg-red-950/20 border-l-4 border-red-600 rounded-r text-gray-100 font-medium">
+                {readingArticle.summary}
               </div>
 
-              <h2 className="text-2xl sm:text-3xl font-editorial font-bold text-white leading-tight">
-                {activeArticle.title}
-              </h2>
-
-              <p className="text-slate-300 text-base leading-relaxed font-light">
-                {activeArticle.summary}
+              <p>
+                Uluslararası haber ajansları ve saha muhabirleri tarafından bildirilen son dakika raporuna göre, yaşanan gelişmeler küresel diplomasi ve bölgesel istikrarda kritik bir kırılma noktasına işaret ediyor. İlgili bürolardan aktarılan bilgilere göre konuyla ilgili tarafların temasları devam ediyor.
               </p>
 
-              <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.06] space-y-2">
-                <h5 className="text-xs font-mono text-rose-400 uppercase font-bold tracking-wider">
-                  Correspondent Notes & Key Context
-                </h5>
-                <p className="text-xs text-slate-300 leading-relaxed">
-                  This report has been cross-referenced through international wire networks. Follow-up dispatches will be published as official statements and on-the-ground developments unfold.
-                </p>
-              </div>
+              <p>
+                Analistler ve bölge uzmanları, bu son dakika gelişmesinin piyasalar, savunma paktları ve uluslararası ilişkiler üzerinde uzun vadeli yansımaları olacağını değerlendiriyor.
+              </p>
 
-              <div className="pt-4 border-t border-white/[0.08] flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={(e) => toggleBookmark(activeArticle.id, e)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-white/10 text-xs font-medium hover:bg-white/[0.05] transition-colors"
-                  >
-                    <Bookmark className="w-3.5 h-3.5" />
-                    <span>{savedIds.has(activeArticle.id) ? "Saved" : "Save"}</span>
-                  </button>
-                  <button
-                    onClick={(e) => shareArticle(activeArticle, e)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-white/10 text-xs font-medium hover:bg-white/[0.05] transition-colors"
-                  >
-                    <Share2 className="w-3.5 h-3.5" />
-                    <span>Share</span>
-                  </button>
+              {/* Dış Ajans Kaynağı Butonu */}
+              <div className="pt-6 border-t border-gray-800 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="text-xs text-gray-400 font-mono">
+                  Doğrulanmış Ajans Bülteni: <b className="text-white">{readingArticle.desk}</b>
                 </div>
 
                 <a
-                  href={activeArticle.url}
+                  href={readingArticle.url}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-2 bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold px-5 py-2.5 rounded-xl transition-all shadow-md shadow-rose-600/30"
+                  className="w-full sm:w-auto inline-flex items-center justify-center space-x-2 bg-red-600 hover:bg-red-700 text-white font-bold px-6 py-3 rounded-lg shadow-lg shadow-red-600/30 transition text-sm"
                 >
-                  View Full Wire Source <ExternalLink className="w-3.5 h-3.5" />
+                  <span>Ajansın Orijinal Haberine Git</span>
+                  <ExternalLink className="w-4 h-4" />
                 </a>
               </div>
             </div>
-          </div>
-        </div>
-      )}
 
-      {/* Footer */}
-      <footer className="border-t border-white/[0.08] bg-[#08090d] py-10 text-xs text-slate-500">
-        <div className="max-w-7xl mx-auto px-4 sm:px-8 flex flex-col md:flex-row justify-between items-center gap-6">
-          <div className="space-y-1 text-center md:text-left">
-            <div className="flex items-center justify-center md:justify-start gap-2">
-              <span className="font-bold text-white text-sm">THE WIRE PULSE</span>
-              <span className="text-slate-600">•</span>
-              <span>Autonomous Global Journalism Network</span>
+            {/* İlgili Son Dakika Haberleri Kuşağı */}
+            <div className="mt-12 pt-8 border-t border-gray-800">
+              <h3 className="text-base font-bold text-white uppercase tracking-wider flex items-center space-x-2 mb-4">
+                <Flame className="w-4 h-4 text-red-500" />
+                <span>Gündemdeki Diğer Son Dakika Gelişmeleri</span>
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {articles.filter(a => a.id !== readingArticle.id).slice(0, 3).map((rel) => (
+                  <div
+                    key={`rel-${rel.id}`}
+                    onClick={() => {
+                      setReadingArticle(rel);
+                      window.scrollTo({ top: 0, behavior: "smooth" });
+                    }}
+                    className="bg-[#1a202c] border border-gray-800 rounded-lg p-3 hover:border-red-500 cursor-pointer transition group"
+                  >
+                    <div className="aspect-video w-full rounded overflow-hidden mb-2 bg-black">
+                      <img src={rel.imageUrl} alt={rel.title} className="w-full h-full object-cover group-hover:scale-105 transition" />
+                    </div>
+                    <span className="text-[10px] text-red-500 font-bold uppercase">{rel.category}</span>
+                    <h4 className="text-xs font-bold text-gray-100 group-hover:text-red-400 line-clamp-2 mt-1">
+                      {rel.title}
+                    </h4>
+                  </div>
+                ))}
+              </div>
             </div>
-            <p className="text-slate-500 text-[11px]">
-              Verified reporting aggregated from international visual wire feeds.
-            </p>
+          </div>
+        ) : (
+          /* ========================================================
+              STANDART HABER PORTALI VİTRİNİ (Manşet Slider + Akış)
+          ======================================================== */
+          <div className="space-y-10">
+            {/* MANŞET VE SAĞ CANLI AKIŞ BLOKU */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+              {/* SOL KOLON: 1-10 MANŞET SLIDER (8 Kolon) */}
+              <div className="lg:col-span-8 bg-[#121622] border border-gray-800 rounded-xl overflow-hidden shadow-2xl flex flex-col">
+                {activeManset ? (
+                  <div 
+                    className="relative aspect-[16/10] sm:aspect-[16/9] w-full overflow-hidden group cursor-pointer bg-black"
+                    onClick={() => setReadingArticle(activeManset)}
+                  >
+                    <img
+                      src={activeManset.imageUrl}
+                      alt={activeManset.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition duration-700 ease-out"
+                    />
+
+                    {/* Gradient Overlay */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent"></div>
+
+                    {/* Üst Rozetler */}
+                    <div className="absolute top-4 left-4 flex items-center space-x-2">
+                      <span className="bg-red-600 text-white font-black text-xs px-3 py-1 rounded shadow-lg uppercase tracking-wider flex items-center">
+                        <Flame className="w-3.5 h-3.5 mr-1" />
+                        MANŞET {currentMansetIndex + 1}
+                      </span>
+                      <span className="bg-black/60 backdrop-blur-md text-gray-300 font-mono text-xs px-2.5 py-1 rounded border border-gray-700">
+                        {activeManset.source}
+                      </span>
+                    </div>
+
+                    {/* Alt Metin Alanı */}
+                    <div className="absolute bottom-0 inset-x-0 p-5 sm:p-8">
+                      <div className="flex items-center space-x-3 text-xs text-gray-300 mb-2 font-mono">
+                        <span className="text-red-400 font-bold uppercase">{activeManset.category}</span>
+                        <span>•</span>
+                        <span>{activeManset.timeAgo}</span>
+                      </div>
+
+                      <h2 className="text-xl sm:text-3xl font-extrabold text-white leading-tight group-hover:text-red-400 transition mb-3 line-clamp-3">
+                        {activeManset.title}
+                      </h2>
+
+                      <p className="text-xs sm:text-sm text-gray-300 line-clamp-2 font-normal hidden sm:block">
+                        {activeManset.summary}
+                      </p>
+
+                      <div className="mt-4 flex items-center space-x-4">
+                        <span className="inline-flex items-center text-xs font-bold bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded transition shadow">
+                          Haberin Detayını Oku →
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Sol / Sağ Oklar */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setCurrentMansetIndex((prev) => (prev - 1 + mansetList.length) % mansetList.length);
+                      }}
+                      className="absolute left-3 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-red-600 text-white p-2 rounded-full transition border border-gray-700 opacity-0 group-hover:opacity-100"
+                    >
+                      <ChevronLeft className="w-5 h-5" />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setCurrentMansetIndex((prev) => (prev + 1) % mansetList.length);
+                      }}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-red-600 text-white p-2 rounded-full transition border border-gray-700 opacity-0 group-hover:opacity-100"
+                    >
+                      <ChevronRight className="w-5 h-5" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="aspect-video flex items-center justify-center text-gray-500 font-mono text-sm">
+                    Haber bülteni yükleniyor...
+                  </div>
+                )}
+
+                {/* 1'den 10'a MANŞET NUMARALARI ÇUBUĞU */}
+                <div className="bg-[#0b0e14] border-t border-gray-800 p-2 flex items-center justify-between overflow-x-auto">
+                  <div className="flex items-center space-x-1.5 w-full justify-between px-1">
+                    {mansetList.map((_, idx) => {
+                      const isCurrent = idx === currentMansetIndex;
+                      return (
+                        <button
+                          key={`manset-num-${idx}`}
+                          onClick={() => setCurrentMansetIndex(idx)}
+                          className={`flex-1 min-w-[32px] py-2 rounded text-xs sm:text-sm font-black transition relative ${
+                            isCurrent
+                              ? "bg-red-600 text-white shadow-lg shadow-red-600/40"
+                              : "bg-[#181d28] text-gray-400 hover:text-white hover:bg-gray-800"
+                          }`}
+                        >
+                          {idx + 1}
+                          {isCurrent && (
+                            <span className="absolute bottom-0 inset-x-0 h-0.5 bg-white"></span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* SAĞ KOLON: DAKİKA DAKİKA SON DAKİKA AKIŞI (4 Kolon) */}
+              <div className="lg:col-span-4 bg-[#121622] border border-gray-800 rounded-xl overflow-hidden shadow-2xl flex flex-col h-[520px] sm:h-[580px]">
+                {/* Başlık */}
+                <div className="bg-[#181e2b] px-4 py-3 border-b border-gray-800 flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-red-600 animate-pulse-fast"></span>
+                    <h3 className="font-black text-sm uppercase tracking-wider text-white">
+                      DAKİKA DAKİKA SON DAKİKA
+                    </h3>
+                  </div>
+                  <span className="text-[10px] font-mono text-gray-400">CANLI AKIŞ</span>
+                </div>
+
+                {/* Akış Listesi */}
+                <div className="flex-1 overflow-y-auto divide-y divide-gray-800/80 custom-scrollbar p-1">
+                  {sonDakikaAkisi.map((art, idx) => (
+                    <div
+                      key={`stream-${art.id}-${idx}`}
+                      onClick={() => setReadingArticle(art)}
+                      className="p-3 hover:bg-[#1c2230] cursor-pointer transition group"
+                    >
+                      <div className="flex items-start space-x-3">
+                        {/* Saat Rozeti */}
+                        <div className="shrink-0 text-center">
+                          <span className="inline-block bg-red-950/60 border border-red-800/50 text-red-400 font-mono text-[11px] font-bold px-1.5 py-0.5 rounded">
+                            {art.timeAgo}
+                          </span>
+                        </div>
+
+                        {/* İçerik */}
+                        <div className="flex-1 min-w-0">
+                          <span className="text-[10px] text-gray-400 font-semibold uppercase">
+                            {art.source} • <span className="text-red-400">{art.category}</span>
+                          </span>
+                          <h4 className="text-xs sm:text-sm font-bold text-gray-200 group-hover:text-red-400 transition line-clamp-2 leading-snug mt-0.5">
+                            {art.title}
+                          </h4>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Alt Bilgi */}
+                <div className="bg-[#0b0e14] px-4 py-2 text-[11px] text-gray-400 border-t border-gray-800 flex items-center justify-between">
+                  <span>Toplam {articles.length} doğrulanmış telgraf</span>
+                  <span className="text-emerald-400 font-mono">● Otomatik Senkron</span>
+                </div>
+              </div>
+            </div>
+
+            {/* 4'LÜ SÜRMANŞET KUŞAĞI (Alt Manşetler) */}
+            <div className="space-y-4">
+              <div className="flex items-center space-x-2 border-b-2 border-red-600 pb-2">
+                <Flame className="w-5 h-5 text-red-600" />
+                <h3 className="text-lg font-black uppercase tracking-wider text-white">
+                  ÖNE ÇIKAN FLAŞ GELİŞMELER
+                </h3>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {surmansetler.map((art) => (
+                  <div
+                    key={`sur-${art.id}`}
+                    onClick={() => setReadingArticle(art)}
+                    className="bg-[#121622] border border-gray-800 hover:border-red-600 rounded-xl overflow-hidden shadow-lg hover:shadow-red-900/20 cursor-pointer transition group flex flex-col"
+                  >
+                    <div className="relative aspect-[16/10] w-full overflow-hidden bg-black">
+                      <img
+                        src={art.imageUrl}
+                        alt={art.title}
+                        className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+                      />
+                      <span className="absolute top-2 left-2 bg-red-600 text-white font-extrabold text-[10px] px-2 py-0.5 rounded uppercase tracking-wider">
+                        {art.category}
+                      </span>
+                    </div>
+
+                    <div className="p-4 flex-1 flex flex-col justify-between">
+                      <div>
+                        <div className="flex items-center justify-between text-[11px] text-gray-400 font-mono mb-2">
+                          <span>{art.source}</span>
+                          <span>{art.timeAgo}</span>
+                        </div>
+                        <h4 className="text-sm font-bold text-white group-hover:text-red-400 transition line-clamp-3 leading-snug">
+                          {art.title}
+                        </h4>
+                      </div>
+
+                      <div className="mt-3 pt-3 border-t border-gray-800/80 flex items-center justify-between text-xs text-gray-400">
+                        <span className="text-red-500 font-semibold group-hover:underline">Detayı Oku →</span>
+                        <div className="flex items-center space-x-2">
+                          <button
+                            onClick={(e) => toggleBookmark(art.id, e)}
+                            className="p-1 hover:text-white"
+                          >
+                            <Bookmark className={`w-3.5 h-3.5 ${savedIds.has(art.id) ? "text-amber-400 fill-amber-400" : ""}`} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* DÜNYA & JEOPOLİTİK GÜNDEM BLOKU */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* DÜNYA GÜNDEMİ */}
+              <div className="bg-[#121622] border border-gray-800 rounded-xl p-5 shadow-lg space-y-4">
+                <div className="flex items-center justify-between border-b-2 border-blue-600 pb-2">
+                  <div className="flex items-center space-x-2">
+                    <Globe2 className="w-4 h-4 text-blue-500" />
+                    <h3 className="font-black text-sm uppercase text-white tracking-wide">DÜNYA & DİPLOMASİ</h3>
+                  </div>
+                  <span className="text-[10px] text-gray-400 font-mono">BÖLGESEL RAPORLAR</span>
+                </div>
+
+                <div className="space-y-3">
+                  {dunyaHaberleri.map((art) => (
+                    <div
+                      key={`dunya-${art.id}`}
+                      onClick={() => setReadingArticle(art)}
+                      className="flex items-start space-x-3 p-2 rounded hover:bg-gray-800/50 cursor-pointer transition group"
+                    >
+                      <img src={art.imageUrl} alt={art.title} className="w-16 h-16 rounded object-cover shrink-0 bg-black" />
+                      <div className="min-w-0">
+                        <span className="text-[10px] text-blue-400 font-bold uppercase">{art.source}</span>
+                        <h4 className="text-xs font-bold text-gray-200 group-hover:text-blue-400 line-clamp-2 leading-snug">
+                          {art.title}
+                        </h4>
+                        <span className="text-[10px] text-gray-500">{art.timeAgo}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* EKONOMİ & PİYASALAR */}
+              <div className="bg-[#121622] border border-gray-800 rounded-xl p-5 shadow-lg space-y-4">
+                <div className="flex items-center justify-between border-b-2 border-emerald-600 pb-2">
+                  <div className="flex items-center space-x-2">
+                    <TrendingUp className="w-4 h-4 text-emerald-500" />
+                    <h3 className="font-black text-sm uppercase text-white tracking-wide">EKONOMİ & TİCARET</h3>
+                  </div>
+                  <span className="text-[10px] text-gray-400 font-mono">KÜRESEL PİYASALAR</span>
+                </div>
+
+                <div className="space-y-3">
+                  {ekonomiHaberleri.map((art) => (
+                    <div
+                      key={`eko-${art.id}`}
+                      onClick={() => setReadingArticle(art)}
+                      className="flex items-start space-x-3 p-2 rounded hover:bg-gray-800/50 cursor-pointer transition group"
+                    >
+                      <img src={art.imageUrl} alt={art.title} className="w-16 h-16 rounded object-cover shrink-0 bg-black" />
+                      <div className="min-w-0">
+                        <span className="text-[10px] text-emerald-400 font-bold uppercase">{art.source}</span>
+                        <h4 className="text-xs font-bold text-gray-200 group-hover:text-emerald-400 line-clamp-2 leading-snug">
+                          {art.title}
+                        </h4>
+                        <span className="text-[10px] text-gray-500">{art.timeAgo}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* SAVUNMA & ÇATIŞMA */}
+              <div className="bg-[#121622] border border-gray-800 rounded-xl p-5 shadow-lg space-y-4">
+                <div className="flex items-center justify-between border-b-2 border-red-600 pb-2">
+                  <div className="flex items-center space-x-2">
+                    <ShieldAlert className="w-4 h-4 text-red-500" />
+                    <h3 className="font-black text-sm uppercase text-white tracking-wide">SAVUNMA & ÇATIŞMA</h3>
+                  </div>
+                  <span className="text-[10px] text-gray-400 font-mono">GÜVENLİK HATTI</span>
+                </div>
+
+                <div className="space-y-3">
+                  {savunmaHaberleri.map((art) => (
+                    <div
+                      key={`sav-${art.id}`}
+                      onClick={() => setReadingArticle(art)}
+                      className="flex items-start space-x-3 p-2 rounded hover:bg-gray-800/50 cursor-pointer transition group"
+                    >
+                      <img src={art.imageUrl} alt={art.title} className="w-16 h-16 rounded object-cover shrink-0 bg-black" />
+                      <div className="min-w-0">
+                        <span className="text-[10px] text-red-400 font-bold uppercase">{art.source}</span>
+                        <h4 className="text-xs font-bold text-gray-200 group-hover:text-red-400 line-clamp-2 leading-snug">
+                          {art.title}
+                        </h4>
+                        <span className="text-[10px] text-gray-500">{art.timeAgo}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </main>
+
+      {/* FOOTER */}
+      <footer className="bg-[#080a0f] border-t border-gray-800 py-8 px-4 sm:px-8 mt-12 text-xs text-gray-400">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="flex items-center space-x-3">
+            <div className="w-7 h-7 rounded bg-red-600 flex items-center justify-center font-black text-white text-xs">
+              WP
+            </div>
+            <div>
+              <span className="font-bold text-white tracking-wider">THE WIRE PULSE</span>
+              <p className="text-[11px] text-gray-500">
+                Bağımsız Küresel Ajans Dağıtım & Son Dakika Haber Portalı.
+              </p>
+            </div>
           </div>
 
-          <div className="flex items-center gap-6">
-            <a href="https://www.instagram.com/thewirepulse/" target="_blank" rel="noreferrer" className="text-slate-400 hover:text-white transition-colors">
-              Instagram: @thewirepulse
+          <div className="flex items-center space-x-6 text-[11px]">
+            <span>Canlı Veri Kaynakları: Reuters, BBC, DW, France 24, Al Jazeera</span>
+            <a
+              href="https://www.instagram.com/thewirepulse/"
+              target="_blank"
+              rel="noreferrer"
+              className="text-pink-400 hover:text-pink-300 font-semibold"
+            >
+              Instagram @thewirepulse
             </a>
-            <span>•</span>
-            <span className="font-mono text-slate-500">Optimized for Vercel Edge</span>
           </div>
         </div>
       </footer>
