@@ -12,7 +12,7 @@
 
 ## ⚡ Features
 
-- 📰 **1-10 Dynamic Manşet Slider:** Real-time breaking carousel featuring auto-play, timer bar, category badges, and keyboard navigation.
+- 📰 **1-10 Dynamic Headline Carousel:** Real-time breaking carousel featuring auto-play, timer bar, category badges, and keyboard navigation.
 - 🔴 **Live Ticker Ribbon:** Continuous streaming agency wire updates with sub-minute latency indicators.
 - 🧭 **Editorial Taxonomy:** Dedicated desks for *World Affairs*, *Defense & Conflict*, *Global Markets*, *AI & Technology*, and *Diplomacy*.
 - 📖 **Immersive Full-Screen Reader:** Deep editorial article viewer with original agency citations and related wire stories.
