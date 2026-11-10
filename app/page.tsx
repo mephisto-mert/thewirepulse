@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useEffect, useState, useMemo, useRef } from "react";
-import { WireArticle } from "@/lib/feeds";
+import React, { useEffect, useState, useMemo, useRef, useCallback } from "react";
+import { WireArticle, sanitizeSafeUrl } from "@/lib/feeds";
+import { OperationalClocks } from "@/app/components/OperationalClocks";
 import {
   ShieldAlert,
   Cpu,
@@ -11,15 +12,11 @@ import {
   RefreshCw,
   Search,
   Instagram,
-  Clock,
   Bookmark,
   Share2,
-  ChevronLeft,
   ChevronRight,
-  Flame,
   Radio,
   ArrowLeft,
-  Calendar,
   CheckCircle2,
   Volume2,
   VolumeX,
@@ -28,10 +25,9 @@ import {
   Activity,
   Layers,
   Crosshair,
-  AlertTriangle,
   Globe,
-  Compass,
-  FileText
+  FileText,
+  X
 } from "lucide-react";
 
 // TACTICAL INTELLIGENCE DESKS
@@ -57,12 +53,15 @@ const FINANCIAL_TICKER = [
   { symbol: "NAT GAS", price: "$2.82", change: "-1.1%", isUp: false }
 ];
 
+// Duplicated for seamless gapless loop
+const SEAMLESS_TICKER = [...FINANCIAL_TICKER, ...FINANCIAL_TICKER];
+
 // GEOPOLITICAL HOTSPOT WATCHLIST
 const HOTSPOT_TELEMETRY = [
-  { name: "STRAIT OF HORMUZ", status: "HIGH SURVEILLANCE", level: "ORANGE", ping: "94ms" },
-  { name: "TAIWAN STRAIT", status: "AIR PATROL ACTIVE", level: "YELLOW", ping: "112ms" },
-  { name: "RED SEA CORRIDOR", status: "ESCORT MANDATE", level: "RED", ping: "87ms" },
-  { name: "EAST EUROPEAN FLANK", status: "INTELLIGENCE AIR", level: "YELLOW", ping: "45ms" }
+  { name: "STRAIT OF HORMUZ", status: "HIGH SURVEILLANCE", level: "ORANGE" },
+  { name: "TAIWAN STRAIT", status: "AIR PATROL ACTIVE", level: "YELLOW" },
+  { name: "RED SEA CORRIDOR", status: "ESCORT MANDATE", level: "RED" },
+  { name: "EAST EUROPEAN FLANK", status: "INTELLIGENCE AIR", level: "YELLOW" }
 ];
 
 export default function TacticalTerminalPage() {
@@ -77,20 +76,17 @@ export default function TacticalTerminalPage() {
   const [audioEnabled, setAudioEnabled] = useState<boolean>(false);
   const [isAutoPlay, setIsAutoPlay] = useState<boolean>(true);
 
-  // Clocks
-  const [utcTime, setUtcTime] = useState<string>("");
-  const [nycTime, setNycTime] = useState<string>("");
-  const [ldnTime, setLdnTime] = useState<string>("");
-  const [tyoTime, setTyoTime] = useState<string>("");
-
   const audioCtxRef = useRef<AudioContext | null>(null);
+  const toastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Synthetic Web Audio Teletype Blip
-  const playTeletypeBlip = () => {
+  const playTeletypeBlip = useCallback(() => {
     if (!audioEnabled || typeof window === "undefined") return;
     try {
-      if (!audioCtxRef.current) {
-        const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      if (!audioCtxRef.current || audioCtxRef.current.state === "closed") {
+        const AudioContextClass =
+          window.AudioContext ||
+          (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
         audioCtxRef.current = new AudioContextClass();
       }
       const ctx = audioCtxRef.current;
@@ -110,11 +106,34 @@ export default function TacticalTerminalPage() {
     } catch {
       // Audio fallback silent
     }
-  };
+  }, [audioEnabled]);
+
+  // Clean AudioContext on component unmount
+  useEffect(() => {
+    return () => {
+      if (audioCtxRef.current && audioCtxRef.current.state !== "closed") {
+        audioCtxRef.current.close().catch(() => {});
+        audioCtxRef.current = null;
+      }
+    };
+  }, []);
+
+  // Restore saved bookmarks from localStorage
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("thewirepulse_saved_ids");
+      if (stored) {
+        setSavedIds(new Set(JSON.parse(stored)));
+      }
+    } catch {
+      // Storage unavailable fallback
+    }
+  }, []);
 
   const showToast = (msg: string) => {
+    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
     setToastMessage(msg);
-    setTimeout(() => setToastMessage(""), 2800);
+    toastTimeoutRef.current = setTimeout(() => setToastMessage(""), 2800);
   };
 
   const toggleBookmark = (id: string, e: React.MouseEvent) => {
@@ -128,6 +147,9 @@ export default function TacticalTerminalPage() {
         next.add(id);
         showToast("Dispatch saved to tactical dossier!");
       }
+      try {
+        localStorage.setItem("thewirepulse_saved_ids", JSON.stringify(Array.from(next)));
+      } catch {}
       return next;
     });
   };
@@ -141,7 +163,7 @@ export default function TacticalTerminalPage() {
   };
 
   // Fetch real-time wire feeds
-  const fetchNews = async () => {
+  const fetchNews = useCallback(async () => {
     try {
       setLoading(true);
       const res = await fetch("/api/news");
@@ -155,35 +177,42 @@ export default function TacticalTerminalPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [playTeletypeBlip]);
 
+  // Visibility-aware auto-polling (pauses when tab is hidden)
   useEffect(() => {
     fetchNews();
-    const interval = setInterval(fetchNews, 60000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // Multi-Timezone Operational Clocks
-  useEffect(() => {
-    const updateClocks = () => {
-      const now = new Date();
-      setUtcTime(
-        now.toLocaleTimeString("en-US", { timeZone: "UTC", hour12: false }) + " UTC"
-      );
-      setNycTime(
-        now.toLocaleTimeString("en-US", { timeZone: "America/New_York", hour12: false, hour: "2-digit", minute: "2-digit" }) + " EST"
-      );
-      setLdnTime(
-        now.toLocaleTimeString("en-US", { timeZone: "Europe/London", hour12: false, hour: "2-digit", minute: "2-digit" }) + " GMT"
-      );
-      setTyoTime(
-        now.toLocaleTimeString("en-US", { timeZone: "Asia/Tokyo", hour12: false, hour: "2-digit", minute: "2-digit" }) + " JST"
-      );
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        fetchNews();
+      }
     };
-    updateClocks();
-    const t = setInterval(updateClocks, 1000);
-    return () => clearInterval(t);
-  }, []);
+    const interval = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        fetchNews();
+      }
+    }, 60000);
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [fetchNews]);
+
+  // Keyboard navigation & Escape dismiss for reader modal
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && readingArticle) {
+        setReadingArticle(null);
+      }
+    };
+    if (readingArticle) {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [readingArticle]);
 
   // Filtering
   const filteredArticles = useMemo(() => {
@@ -198,25 +227,31 @@ export default function TacticalTerminalPage() {
     });
   }, [articles, selectedDesk, searchQuery]);
 
-  // Top 10 Carousel Headlines
+  // Reset slide index when desk or search changes
+  useEffect(() => {
+    setCurrentSlideIndex(0);
+  }, [selectedDesk, searchQuery]);
+
+  // Main Theater derives directly from filteredArticles
   const carouselHeadlines = useMemo(() => {
-    return articles.slice(0, 10);
-  }, [articles]);
+    return filteredArticles.slice(0, 10);
+  }, [filteredArticles]);
+
+  const secondaryArticles = useMemo(() => {
+    return filteredArticles.slice(10, 14);
+  }, [filteredArticles]);
 
   const activeHeadline = carouselHeadlines[currentSlideIndex] || carouselHeadlines[0] || null;
 
-  // Auto-play Carousel (6 seconds)
+  // Auto-play Carousel (6 seconds) with separate audio trigger
   useEffect(() => {
     if (!isAutoPlay || carouselHeadlines.length === 0 || readingArticle) return;
     const timer = setInterval(() => {
-      setCurrentSlideIndex((prev) => {
-        const next = (prev + 1) % carouselHeadlines.length;
-        playTeletypeBlip();
-        return next;
-      });
+      setCurrentSlideIndex((prev) => (prev + 1) % carouselHeadlines.length);
+      playTeletypeBlip();
     }, 6000);
     return () => clearInterval(timer);
-  }, [isAutoPlay, carouselHeadlines.length, readingArticle, audioEnabled]);
+  }, [isAutoPlay, carouselHeadlines.length, readingArticle, playTeletypeBlip]);
 
   return (
     <div className="min-h-screen bg-[#06080d] text-slate-100 flex flex-col font-sans selection:bg-red-600 selection:text-white tactical-grid">
@@ -250,16 +285,8 @@ export default function TacticalTerminalPage() {
             </div>
           </div>
 
-          {/* Multi-Timezone Operational Clocks */}
-          <div className="flex items-center space-x-4 font-mono text-[11px] text-gray-300 bg-[#0d121c] border border-gray-800 px-3 py-1 rounded">
-            <span className="text-red-400 font-bold">{utcTime}</span>
-            <span className="text-gray-600">•</span>
-            <span className="hidden sm:inline text-gray-400">{nycTime}</span>
-            <span className="hidden md:inline text-gray-600">•</span>
-            <span className="hidden md:inline text-gray-400">{ldnTime}</span>
-            <span className="hidden lg:inline text-gray-600">•</span>
-            <span className="hidden lg:inline text-gray-400">{tyoTime}</span>
-          </div>
+          {/* Multi-Timezone Operational Clocks (Isolated leaf component) */}
+          <OperationalClocks />
 
           {/* Action Bar */}
           <div className="flex items-center space-x-3">
@@ -268,6 +295,7 @@ export default function TacticalTerminalPage() {
                 setAudioEnabled(!audioEnabled);
                 showToast(audioEnabled ? "Audio teletype muted." : "Audio teletype initialized.");
               }}
+              aria-label={audioEnabled ? "Mute audio teletype" : "Enable audio teletype"}
               className={`flex items-center space-x-1.5 px-2.5 py-1 rounded border text-[11px] font-mono transition ${
                 audioEnabled
                   ? "bg-red-950/80 border-red-600 text-red-300"
@@ -281,6 +309,7 @@ export default function TacticalTerminalPage() {
             <button
               onClick={fetchNews}
               disabled={loading}
+              aria-label="Synchronize live wire telemetry"
               className="flex items-center space-x-1.5 px-2.5 py-1 rounded bg-gray-900 hover:bg-gray-800 border border-gray-800 text-gray-300 text-[11px] font-mono transition"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin text-red-500" : ""}`} />
@@ -290,7 +319,7 @@ export default function TacticalTerminalPage() {
             <a
               href="https://www.instagram.com/thewirepulse/"
               target="_blank"
-              rel="noreferrer"
+              rel="noopener noreferrer"
               className="flex items-center space-x-1.5 px-3 py-1 rounded bg-gradient-to-r from-red-600 to-rose-700 hover:from-red-500 hover:to-rose-600 text-white font-mono text-[11px] font-bold shadow-md shadow-red-900/30 transition"
             >
               <Instagram className="w-3.5 h-3.5" />
@@ -300,7 +329,7 @@ export default function TacticalTerminalPage() {
         </div>
       </header>
 
-      {/* BLOOMBERG DAYBREAK FINANCIAL & COMMODITY TICKER */}
+      {/* BLOOMBERG DAYBREAK FINANCIAL & COMMODITY TICKER (Gapless loop) */}
       <div className="bg-[#040609] border-b border-gray-800/80 py-1.5 px-4 overflow-hidden">
         <div className="max-w-[1600px] mx-auto flex items-center">
           <div className="flex items-center space-x-2 pr-4 shrink-0 border-r border-gray-800 font-mono text-[10px] text-gray-400">
@@ -309,7 +338,7 @@ export default function TacticalTerminalPage() {
           </div>
           <div className="overflow-hidden whitespace-nowrap flex-1 ml-4">
             <div className="inline-block animate-marquee font-mono text-[11px]">
-              {FINANCIAL_TICKER.map((item, idx) => (
+              {SEAMLESS_TICKER.map((item, idx) => (
                 <span key={idx} className="mx-4 inline-flex items-center space-x-1.5">
                   <span className="text-gray-400 font-bold">{item.symbol}</span>
                   <span className="text-white">{item.price}</span>
@@ -328,7 +357,12 @@ export default function TacticalTerminalPage() {
       <main className="max-w-[1600px] w-full mx-auto px-4 sm:px-6 py-5 flex-1">
         {/* DOSSIER READER MODAL */}
         {readingArticle ? (
-          <div className="bg-[#0b0f19] border border-gray-800 rounded-xl p-6 sm:p-10 shadow-2xl animate-fadeIn max-w-4xl mx-auto mb-8">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Classified Intelligence Dossier"
+            className="bg-[#0b0f19] border border-gray-800 rounded-xl p-6 sm:p-10 shadow-2xl animate-fadeIn max-w-4xl mx-auto mb-8 relative"
+          >
             <div className="flex items-center justify-between border-b border-gray-800 pb-4 mb-6">
               <button
                 onClick={() => setReadingArticle(null)}
@@ -341,6 +375,13 @@ export default function TacticalTerminalPage() {
                 <FileText className="w-3.5 h-3.5" />
                 <span>DECLASSIFIED WIRE DOSSIER</span>
               </div>
+              <button
+                onClick={() => setReadingArticle(null)}
+                aria-label="Close dossier reader"
+                className="text-gray-400 hover:text-white p-1 rounded transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
 
             <div className="flex flex-wrap items-center gap-3 font-mono text-xs text-gray-400 mb-4">
@@ -364,6 +405,8 @@ export default function TacticalTerminalPage() {
               <img
                 src={readingArticle.imageUrl}
                 alt={readingArticle.title}
+                loading="lazy"
+                decoding="async"
                 className="w-full h-full object-cover"
               />
               <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/90 p-3 text-[11px] text-gray-300 font-mono">
@@ -385,6 +428,7 @@ export default function TacticalTerminalPage() {
               <div className="flex items-center space-x-3">
                 <button
                   onClick={(e) => toggleBookmark(readingArticle.id, e)}
+                  aria-label="Save this dossier"
                   className="flex items-center space-x-1.5 px-3 py-1.5 rounded bg-gray-900 border border-gray-700 text-xs font-mono text-gray-300 hover:text-white"
                 >
                   <Bookmark className={`w-3.5 h-3.5 ${savedIds.has(readingArticle.id) ? "fill-red-500 text-red-500" : ""}`} />
@@ -392,6 +436,7 @@ export default function TacticalTerminalPage() {
                 </button>
                 <button
                   onClick={(e) => shareDispatch(readingArticle, e)}
+                  aria-label="Share dispatch link"
                   className="flex items-center space-x-1.5 px-3 py-1.5 rounded bg-gray-900 border border-gray-700 text-xs font-mono text-gray-300 hover:text-white"
                 >
                   <Share2 className="w-3.5 h-3.5" />
@@ -400,9 +445,12 @@ export default function TacticalTerminalPage() {
               </div>
 
               <a
-                href={readingArticle.url}
+                href={sanitizeSafeUrl(readingArticle.url)}
                 target="_blank"
-                rel="noreferrer"
+                rel="noopener noreferrer"
+                onClick={(e) => {
+                  if (!readingArticle.url.startsWith("http")) e.preventDefault();
+                }}
                 className="flex items-center space-x-2 px-4 py-2 rounded bg-red-600 hover:bg-red-500 text-white font-mono text-xs font-bold transition shadow-lg shadow-red-900/30"
               >
                 <span>OPEN OFFICIAL SOURCE</span>
@@ -430,7 +478,6 @@ export default function TacticalTerminalPage() {
 
               {/* Radar Graphic */}
               <div className="relative w-full aspect-square max-w-[210px] mx-auto rounded-full border border-gray-800 bg-[#05080e] overflow-hidden flex items-center justify-center mb-4">
-                {/* Concentric rings */}
                 <div className="absolute inset-3 rounded-full border border-dashed border-gray-800"></div>
                 <div className="absolute inset-8 rounded-full border border-gray-800"></div>
                 <div className="absolute inset-14 rounded-full border border-gray-800/60"></div>
@@ -488,7 +535,9 @@ export default function TacticalTerminalPage() {
                         setSelectedDesk(desk.id);
                         setReadingArticle(null);
                       }}
-                      className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-mono transition ${
+                      aria-label={`Select ${desk.label} desk`}
+                      aria-pressed={isActive}
+                      className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-mono transition ${
                         isActive
                           ? "bg-red-600 text-white font-bold shadow-lg shadow-red-900/40"
                           : "text-gray-300 hover:bg-[#111726] hover:text-white"
@@ -525,13 +574,13 @@ export default function TacticalTerminalPage() {
           {/* COLUMN 2: MAIN THEATER (HERO CAROUSEL & BRIEFINGS) (6 Cols on 12-col grid) */}
           <div className="lg:col-span-6 space-y-5">
             {/* HERO CAROUSEL 1-10 SLIDER */}
-            {activeHeadline && (
+            {activeHeadline ? (
               <div className="bg-[#090d16] border border-gray-800/90 rounded-xl overflow-hidden shadow-2xl">
                 {/* Carousel Top Telemetry Bar */}
                 <div className="bg-[#0d121f] border-b border-gray-800 px-4 py-2 flex items-center justify-between text-xs font-mono">
                   <div className="flex items-center space-x-2">
                     <span className="bg-red-600 text-white px-2 py-0.5 rounded font-extrabold text-[10px]">
-                      DISPATCH {currentSlideIndex + 1} / 10
+                      DISPATCH {currentSlideIndex + 1} / {carouselHeadlines.length}
                     </span>
                     <span className="text-gray-400 hidden sm:inline">•</span>
                     <span className="text-gray-300 font-semibold hidden sm:inline">{activeHeadline.desk}</span>
@@ -540,6 +589,7 @@ export default function TacticalTerminalPage() {
                   {/* Play / Pause Toggle */}
                   <button
                     onClick={() => setIsAutoPlay(!isAutoPlay)}
+                    aria-label={isAutoPlay ? "Pause carousel auto-cycle" : "Play carousel auto-cycle"}
                     className="flex items-center space-x-1 text-gray-400 hover:text-white transition text-[11px]"
                   >
                     {isAutoPlay ? <Pause className="w-3 h-3 text-red-400" /> : <Play className="w-3 h-3 text-emerald-400" />}
@@ -548,24 +598,25 @@ export default function TacticalTerminalPage() {
                 </div>
 
                 {/* Hero Media Frame with Ambient Backdrop */}
-                <div className="relative aspect-video w-full bg-black overflow-hidden group cursor-pointer" onClick={() => setReadingArticle(activeHeadline)}>
-                  {/* Ambient blurred backdrop for 16:9 ratio preservation */}
+                <div
+                  className="relative aspect-video w-full bg-black overflow-hidden group cursor-pointer"
+                  onClick={() => setReadingArticle(activeHeadline)}
+                >
                   <div
-                    className="absolute inset-0 bg-cover bg-center filter blur-2xl opacity-40 scale-110"
+                    className="absolute inset-0 bg-cover bg-center filter blur-2xl opacity-40 scale-110 pointer-events-none"
                     style={{ backgroundImage: `url(${activeHeadline.imageUrl})` }}
                   ></div>
 
-                  {/* Sharp Front Image */}
                   <img
                     src={activeHeadline.imageUrl}
                     alt={activeHeadline.title}
+                    loading="eager"
+                    decoding="async"
                     className="relative z-10 w-full h-full object-cover group-hover:scale-102 transition duration-500"
                   />
 
-                  {/* Vignette Overlay */}
-                  <div className="absolute inset-0 z-20 bg-gradient-to-t from-[#090d16] via-[#090d16]/30 to-transparent"></div>
+                  <div className="absolute inset-0 z-20 bg-gradient-to-t from-[#090d16] via-[#090d16]/30 to-transparent pointer-events-none"></div>
 
-                  {/* Overlay Badges */}
                   <div className="absolute top-4 left-4 z-30 flex items-center space-x-2">
                     <span className="bg-red-600 text-white font-mono text-[10px] font-extrabold px-2 py-0.5 rounded shadow">
                       {activeHeadline.category}
@@ -578,7 +629,7 @@ export default function TacticalTerminalPage() {
 
                 {/* Headline & Structured Intelligence Anatomy */}
                 <div className="p-5 space-y-4">
-                  <h2 
+                  <h2
                     onClick={() => setReadingArticle(activeHeadline)}
                     className="text-xl sm:text-2xl font-extrabold text-white leading-tight cursor-pointer hover:text-red-400 transition"
                   >
@@ -605,7 +656,9 @@ export default function TacticalTerminalPage() {
                             setCurrentSlideIndex(idx);
                             playTeletypeBlip();
                           }}
-                          className={`w-7 h-7 rounded text-xs font-mono font-bold transition ${
+                          aria-label={`Jump to dispatch ${idx + 1}`}
+                          aria-current={currentSlideIndex === idx ? "true" : undefined}
+                          className={`w-8 h-8 sm:w-9 sm:h-9 rounded text-xs font-mono font-bold transition flex items-center justify-center ${
                             currentSlideIndex === idx
                               ? "bg-red-600 text-white shadow-lg shadow-red-900/40"
                               : "bg-[#0d121f] text-gray-400 hover:text-white hover:bg-gray-800"
@@ -618,7 +671,7 @@ export default function TacticalTerminalPage() {
 
                     <button
                       onClick={() => setReadingArticle(activeHeadline)}
-                      className="px-3.5 py-1.5 rounded bg-red-600 hover:bg-red-500 text-white font-mono text-xs font-bold transition flex items-center space-x-1.5 shadow"
+                      className="px-3.5 py-2 rounded bg-red-600 hover:bg-red-500 text-white font-mono text-xs font-bold transition flex items-center space-x-1.5 shadow"
                     >
                       <span>READ FULL DOSSIER</span>
                       <ChevronRight className="w-3.5 h-3.5" />
@@ -626,11 +679,15 @@ export default function TacticalTerminalPage() {
                   </div>
                 </div>
               </div>
+            ) : (
+              <div className="bg-[#090d16] border border-gray-800 rounded-xl p-10 text-center font-mono text-gray-400 text-xs">
+                NO ACTIVE TELEMETRY DISPATCHES FOR THIS DESK FILTER
+              </div>
             )}
 
-            {/* SECONDARY TACTICAL DISPATCHES (Stories 11-14) */}
+            {/* SECONDARY TACTICAL DISPATCHES */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {articles.slice(10, 14).map((art) => (
+              {secondaryArticles.map((art) => (
                 <div
                   key={art.id}
                   onClick={() => setReadingArticle(art)}
@@ -641,6 +698,8 @@ export default function TacticalTerminalPage() {
                       <img
                         src={art.imageUrl}
                         alt={art.title}
+                        loading="lazy"
+                        decoding="async"
                         className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
                       />
                       <span className="absolute top-2 left-2 bg-red-950/80 border border-red-700/60 text-red-300 font-mono text-[9px] px-1.5 py-0.5 rounded font-bold uppercase">
@@ -670,7 +729,7 @@ export default function TacticalTerminalPage() {
 
           {/* COLUMN 3: 24/7 RAPID TELETYPE WIRE STREAM (3 Cols on 12-col grid) */}
           <div className="lg:col-span-3">
-            <div className="bg-[#090d16] border border-gray-800/90 rounded-xl p-4 shadow-2xl flex flex-col h-[780px]">
+            <div className="bg-[#090d16] border border-gray-800/90 rounded-xl p-4 shadow-2xl flex flex-col h-[500px] lg:h-[780px]">
               {/* Wire Header */}
               <div className="flex items-center justify-between pb-3 border-b border-gray-800 mb-3 shrink-0">
                 <div className="flex items-center space-x-2">
@@ -690,7 +749,6 @@ export default function TacticalTerminalPage() {
                     onClick={() => setReadingArticle(art)}
                     className="p-2.5 rounded-lg bg-[#0d121f] border border-gray-800/80 hover:border-red-600/80 transition cursor-pointer group"
                   >
-                    {/* Timestamp & Urgency */}
                     <div className="flex items-center justify-between text-[10px] font-mono text-gray-400 mb-1.5">
                       <div className="flex items-center space-x-1">
                         <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>
@@ -699,12 +757,10 @@ export default function TacticalTerminalPage() {
                       <span className="text-gray-500 truncate max-w-[100px]">{art.source}</span>
                     </div>
 
-                    {/* Headline */}
                     <p className="text-xs font-semibold text-gray-200 group-hover:text-red-400 leading-snug line-clamp-2">
                       {art.title}
                     </p>
 
-                    {/* Desk Badge */}
                     <div className="mt-2 flex items-center justify-between text-[9px] font-mono text-gray-500">
                       <span className="text-gray-400 uppercase">{art.category}</span>
                       <span className="group-hover:text-red-400">&rarr; DOSSIER</span>
@@ -735,7 +791,7 @@ export default function TacticalTerminalPage() {
             <a
               href="https://www.instagram.com/thewirepulse/"
               target="_blank"
-              rel="noreferrer"
+              rel="noopener noreferrer"
               className="text-red-400 hover:text-red-300 font-bold"
             >
               @thewirepulse

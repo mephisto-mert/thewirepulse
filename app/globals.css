@@ -40,10 +40,21 @@
   display: flex;
   width: 200%;
   animation: marquee 35s linear infinite;
+  will-change: transform;
+  transform: translateZ(0);
 }
 
 .animate-marquee:hover {
   animation-play-state: paused;
+}
+
+/* WCAG Reduced Motion Protection */
+@media (prefers-reduced-motion: reduce) {
+  .animate-marquee,
+  .animate-radar,
+  .animate-pulse-fast {
+    animation: none !important;
+  }
 }
 
 /* Subtle Tactical Scanline Backdrop */
@@ -54,7 +65,12 @@
     linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
 }
 
-/* Scrollbar styling for breaking news wire */
+/* Cross-Browser Scrollbar styling for breaking news wire */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #1f293d #090c14;
+}
+
 .custom-scrollbar::-webkit-scrollbar {
   width: 4px;
 }
