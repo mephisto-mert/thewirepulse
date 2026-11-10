@@ -4,10 +4,10 @@ const nextConfig = {
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: 'images.unsplash.com' },
-      { protocol: 'https', hostname: 'ichef.bbci.co.uk' },
-      { protocol: 'https', hostname: 'www.france24.com' },
-      { protocol: 'https', hostname: 'rss.dw.com' },
-      { protocol: 'https', hostname: 'www.aljazeera.com' }
+      { protocol: 'https', hostname: '**.bbci.co.uk' },
+      { protocol: 'https', hostname: '**.france24.com' },
+      { protocol: 'https', hostname: '**.dw.com' },
+      { protocol: 'https', hostname: '**.aljazeera.com' }
     ]
   },
   async headers() {
@@ -16,7 +16,7 @@ const nextConfig = {
       "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com data:",
-      "img-src 'self' data: blob: https://images.unsplash.com https://ichef.bbci.co.uk https://www.france24.com https://rss.dw.com https://www.aljazeera.com",
+      "img-src 'self' data: blob: https://images.unsplash.com https://*.bbci.co.uk https://*.france24.com https://*.dw.com https://*.aljazeera.com",
       "connect-src 'self'",
       "frame-ancestors 'none'",
       "object-src 'none'",
