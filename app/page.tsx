@@ -1,51 +1,116 @@
 "use client";
 
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useRef } from "react";
 import { WireArticle } from "@/lib/feeds";
-import { 
-  Globe2, 
-  ShieldAlert, 
-  Cpu, 
-  TrendingUp, 
-  Landmark, 
-  ExternalLink, 
-  RefreshCw, 
-  Search, 
-  Instagram, 
-  Clock, 
-  Bookmark, 
-  Share2, 
-  ChevronLeft, 
-  ChevronRight, 
-  Flame, 
-  Radio, 
-  ArrowLeft, 
-  Calendar, 
-  CheckCircle2, 
-  Eye, 
-  Bell 
+import {
+  ShieldAlert,
+  Cpu,
+  TrendingUp,
+  Landmark,
+  ExternalLink,
+  RefreshCw,
+  Search,
+  Instagram,
+  Clock,
+  Bookmark,
+  Share2,
+  ChevronLeft,
+  ChevronRight,
+  Flame,
+  Radio,
+  ArrowLeft,
+  Calendar,
+  CheckCircle2,
+  Volume2,
+  VolumeX,
+  Play,
+  Pause,
+  Activity,
+  Layers,
+  Crosshair,
+  AlertTriangle,
+  Globe,
+  Compass,
+  FileText
 } from "lucide-react";
 
-const CATEGORIES = [
-  { label: "ALL DISPATCHES", id: "ALL", icon: Flame },
-  { label: "WORLD AFFAIRS", id: "WORLD AFFAIRS", icon: Globe2 },
-  { label: "WAR & DEFENSE", id: "WAR & DEFENSE", icon: ShieldAlert },
-  { label: "GLOBAL MARKETS", id: "MARKETS", icon: TrendingUp },
-  { label: "AI & TECHNOLOGY", id: "AI & TECH", icon: Cpu },
-  { label: "DIPLOMACY & POLITICS", id: "POLITICS", icon: Landmark }
+// TACTICAL INTELLIGENCE DESKS
+const TACTICAL_DESKS = [
+  { label: "ALL INTEL", id: "ALL", icon: Layers, code: "GLOBAL-00" },
+  { label: "WAR & DEFENSE", id: "WAR & DEFENSE", icon: ShieldAlert, code: "DEF-01" },
+  { label: "AI & TECH", id: "AI & TECH", icon: Cpu, code: "TECH-02" },
+  { label: "GLOBAL MARKETS", id: "MARKETS", icon: TrendingUp, code: "MKT-03" },
+  { label: "WORLD AFFAIRS", id: "WORLD AFFAIRS", icon: Globe, code: "GEO-04" },
+  { label: "DIPLOMACY", id: "POLITICS", icon: Landmark, code: "DIP-05" }
 ];
 
-export default function WirePulsePortalPage() {
+// LIVE FINANCIAL & COMMODITY TICKERS (Bloomberg Daybreak Standard)
+const FINANCIAL_TICKER = [
+  { symbol: "BRENT CRUDE", price: "$74.20", change: "+1.4%", isUp: true },
+  { symbol: "GOLD SPOT", price: "$2,684.50", change: "+0.8%", isUp: true },
+  { symbol: "S&P 500", price: "5,983.20", change: "-0.2%", isUp: false },
+  { symbol: "NASDAQ 100", price: "21,114.80", change: "+0.6%", isUp: true },
+  { symbol: "DXY INDEX", price: "105.42", change: "+0.1%", isUp: true },
+  { symbol: "BTC/USD", price: "$88,410", change: "+3.2%", isUp: true },
+  { symbol: "EUR/USD", price: "1.0718", change: "-0.3%", isUp: false },
+  { symbol: "10Y YIELD", price: "4.41%", change: "+0.02", isUp: true },
+  { symbol: "NAT GAS", price: "$2.82", change: "-1.1%", isUp: false }
+];
+
+// GEOPOLITICAL HOTSPOT WATCHLIST
+const HOTSPOT_TELEMETRY = [
+  { name: "STRAIT OF HORMUZ", status: "HIGH SURVEILLANCE", level: "ORANGE", ping: "94ms" },
+  { name: "TAIWAN STRAIT", status: "AIR PATROL ACTIVE", level: "YELLOW", ping: "112ms" },
+  { name: "RED SEA CORRIDOR", status: "ESCORT MANDATE", level: "RED", ping: "87ms" },
+  { name: "EAST EUROPEAN FLANK", status: "INTELLIGENCE AIR", level: "YELLOW", ping: "45ms" }
+];
+
+export default function TacticalTerminalPage() {
   const [articles, setArticles] = useState<WireArticle[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
+  const [selectedDesk, setSelectedDesk] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState<string>("");
-  const [currentHeadlineIndex, setCurrentHeadlineIndex] = useState<number>(0);
+  const [currentSlideIndex, setCurrentSlideIndex] = useState<number>(0);
   const [readingArticle, setReadingArticle] = useState<WireArticle | null>(null);
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
   const [toastMessage, setToastMessage] = useState<string>("");
-  const [currentTime, setCurrentTime] = useState<string>("");
+  const [audioEnabled, setAudioEnabled] = useState<boolean>(false);
   const [isAutoPlay, setIsAutoPlay] = useState<boolean>(true);
+
+  // Clocks
+  const [utcTime, setUtcTime] = useState<string>("");
+  const [nycTime, setNycTime] = useState<string>("");
+  const [ldnTime, setLdnTime] = useState<string>("");
+  const [tyoTime, setTyoTime] = useState<string>("");
+
+  const audioCtxRef = useRef<AudioContext | null>(null);
+
+  // Synthetic Web Audio Teletype Blip
+  const playTeletypeBlip = () => {
+    if (!audioEnabled || typeof window === "undefined") return;
+    try {
+      if (!audioCtxRef.current) {
+        const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+        audioCtxRef.current = new AudioContextClass();
+      }
+      const ctx = audioCtxRef.current;
+      if (ctx.state === "suspended") {
+        ctx.resume();
+      }
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(880, ctx.currentTime);
+      gain.gain.setValueAtTime(0.04, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.05);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.05);
+    } catch {
+      // Audio fallback silent
+    }
+  };
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -58,16 +123,16 @@ export default function WirePulsePortalPage() {
       const next = new Set(prev);
       if (next.has(id)) {
         next.delete(id);
-        showToast("Removed from saved reading list.");
+        showToast("Dispatch removed from tactical dossier.");
       } else {
         next.add(id);
-        showToast("Saved to your reading list!");
+        showToast("Dispatch saved to tactical dossier!");
       }
       return next;
     });
   };
 
-  const shareArticle = (art: WireArticle, e: React.MouseEvent) => {
+  const shareDispatch = (art: WireArticle, e: React.MouseEvent) => {
     e.stopPropagation();
     if (typeof window !== "undefined" && navigator.clipboard) {
       navigator.clipboard.writeText(art.url);
@@ -75,6 +140,7 @@ export default function WirePulsePortalPage() {
     }
   };
 
+  // Fetch real-time wire feeds
   const fetchNews = async () => {
     try {
       setLoading(true);
@@ -82,9 +148,10 @@ export default function WirePulsePortalPage() {
       const data = await res.json();
       if (data.success && data.articles && data.articles.length > 0) {
         setArticles(data.articles);
+        playTeletypeBlip();
       }
     } catch (e) {
-      console.error("Error fetching wire feeds:", e);
+      console.error("Telemetry sync error:", e);
     } finally {
       setLoading(false);
     }
@@ -92,652 +159,586 @@ export default function WirePulsePortalPage() {
 
   useEffect(() => {
     fetchNews();
-    const interval = setInterval(fetchNews, 60000); // 60s auto re-sync
+    const interval = setInterval(fetchNews, 60000);
     return () => clearInterval(interval);
   }, []);
 
-  // Global Clock in UTC & Local
+  // Multi-Timezone Operational Clocks
   useEffect(() => {
-    const updateTime = () => {
+    const updateClocks = () => {
       const now = new Date();
-      setCurrentTime(
-        now.toLocaleDateString("en-US", {
-          weekday: "short",
-          month: "short",
-          day: "numeric",
-          hour: "2-digit",
-          minute: "2-digit",
-          second: "2-digit",
-          hour12: false
-        }) + " UTC"
+      setUtcTime(
+        now.toLocaleTimeString("en-US", { timeZone: "UTC", hour12: false }) + " UTC"
+      );
+      setNycTime(
+        now.toLocaleTimeString("en-US", { timeZone: "America/New_York", hour12: false, hour: "2-digit", minute: "2-digit" }) + " EST"
+      );
+      setLdnTime(
+        now.toLocaleTimeString("en-US", { timeZone: "Europe/London", hour12: false, hour: "2-digit", minute: "2-digit" }) + " GMT"
+      );
+      setTyoTime(
+        now.toLocaleTimeString("en-US", { timeZone: "Asia/Tokyo", hour12: false, hour: "2-digit", minute: "2-digit" }) + " JST"
       );
     };
-    updateTime();
-    const t = setInterval(updateTime, 1000);
+    updateClocks();
+    const t = setInterval(updateClocks, 1000);
     return () => clearInterval(t);
   }, []);
 
-  // Filtered by Category and Search
+  // Filtering
   const filteredArticles = useMemo(() => {
     return articles.filter((art) => {
-      const matchCat = selectedCategory === "ALL" || art.category === selectedCategory;
+      const matchDesk = selectedDesk === "ALL" || art.category === selectedDesk;
       const matchSearch =
         !searchQuery ||
         art.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         art.summary.toLowerCase().includes(searchQuery.toLowerCase()) ||
         art.source.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchCat && matchSearch;
+      return matchDesk && matchSearch;
     });
-  }, [articles, selectedCategory, searchQuery]);
+  }, [articles, selectedDesk, searchQuery]);
 
   // Top 10 Carousel Headlines
-  const headlineList = useMemo(() => {
+  const carouselHeadlines = useMemo(() => {
     return articles.slice(0, 10);
   }, [articles]);
 
-  const activeHeadline = headlineList[currentHeadlineIndex] || headlineList[0] || null;
+  const activeHeadline = carouselHeadlines[currentSlideIndex] || carouselHeadlines[0] || null;
 
-  // Auto-play Slider (Every 5 seconds)
+  // Auto-play Carousel (6 seconds)
   useEffect(() => {
-    if (!isAutoPlay || headlineList.length === 0 || readingArticle) return;
+    if (!isAutoPlay || carouselHeadlines.length === 0 || readingArticle) return;
     const timer = setInterval(() => {
-      setCurrentHeadlineIndex((prev) => (prev + 1) % headlineList.length);
-    }, 5500);
+      setCurrentSlideIndex((prev) => {
+        const next = (prev + 1) % carouselHeadlines.length;
+        playTeletypeBlip();
+        return next;
+      });
+    }, 6000);
     return () => clearInterval(timer);
-  }, [isAutoPlay, headlineList.length, readingArticle]);
-
-  // Keyboard Navigation for Carousel (Left/Right Arrows)
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (readingArticle) return;
-      if (e.key === "ArrowLeft") {
-        setCurrentHeadlineIndex((prev) => (prev - 1 + headlineList.length) % headlineList.length);
-      } else if (e.key === "ArrowRight") {
-        setCurrentHeadlineIndex((prev) => (prev + 1) % headlineList.length);
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [headlineList.length, readingArticle]);
-
-  // Desk Segments
-  const realtimeStream = useMemo(() => articles.slice(0, 18), [articles]);
-  const topDevelopments = useMemo(() => articles.slice(10, 14), [articles]);
-  const worldDispatches = useMemo(() => articles.filter((a) => a.category === "WORLD AFFAIRS").slice(0, 5), [articles]);
-  const marketDispatches = useMemo(() => articles.filter((a) => a.category === "MARKETS").slice(0, 5), [articles]);
-  const defenseDispatches = useMemo(() => articles.filter((a) => a.category === "WAR & DEFENSE").slice(0, 5), [articles]);
+  }, [isAutoPlay, carouselHeadlines.length, readingArticle, audioEnabled]);
 
   return (
-    <div className="min-h-screen bg-[#07090e] text-slate-100 flex flex-col font-sans selection:bg-red-600 selection:text-white">
-      {/* TOAST NOTIFICATION */}
+    <div className="min-h-screen bg-[#06080d] text-slate-100 flex flex-col font-sans selection:bg-red-600 selection:text-white tactical-grid">
+      {/* TOAST FEEDBACK */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 bg-red-600 text-white text-xs font-bold px-4 py-2.5 rounded-lg shadow-2xl flex items-center space-x-2 animate-bounce">
+        <div className="fixed bottom-6 right-6 z-50 bg-red-600 text-white text-xs font-mono font-bold px-4 py-2.5 rounded-lg shadow-2xl flex items-center space-x-2 animate-bounce border border-red-400">
           <CheckCircle2 className="w-4 h-4" />
           <span>{toastMessage}</span>
         </div>
       )}
 
-      {/* TOP STREAMING TICKER */}
-      <div className="bg-[#0b0e17] border-b border-gray-800 text-[11px] py-1.5 px-4 sm:px-8 flex items-center justify-between overflow-hidden">
-        <div className="flex items-center space-x-3 shrink-0">
-          <span className="flex items-center font-black tracking-wider text-red-500 uppercase bg-red-950/60 border border-red-800/40 px-2 py-0.5 rounded text-[10px]">
-            <Radio className="w-3 h-3 mr-1 animate-pulse" />
-            LIVE WIRE
-          </span>
-          <span className="text-gray-400 font-mono hidden md:inline">{currentTime}</span>
-        </div>
-
-        {/* Marquee ticker text */}
-        <div className="overflow-hidden whitespace-nowrap mx-4 flex-1">
-          <div className="inline-block animate-marquee text-gray-300">
-            {articles.slice(0, 8).map((art, idx) => (
-              <span 
-                key={`ticker-${idx}`} 
-                onClick={() => setReadingArticle(art)}
-                className="cursor-pointer hover:text-red-400 transition mx-4"
-              >
-                <b className="text-red-500">[{art.category}]</b> {art.title} &nbsp;•&nbsp;
-              </span>
-            ))}
-          </div>
-        </div>
-
-        <div className="flex items-center space-x-3 shrink-0">
-          <a
-            href="https://www.instagram.com/thewirepulse/"
-            target="_blank"
-            rel="noreferrer"
-            className="flex items-center text-pink-400 hover:text-pink-300 transition text-[11px] font-semibold"
-          >
-            <Instagram className="w-3.5 h-3.5 mr-1" />
-            <span className="hidden sm:inline">@thewirepulse</span>
-          </a>
-        </div>
-      </div>
-
-      {/* MAIN HEADER */}
-      <header className="bg-[#0b0e14]/90 backdrop-blur-md border-b border-gray-800/80 sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-8 py-3.5 flex flex-col md:flex-row items-center justify-between gap-4">
-          {/* Logo & Identity */}
-          <div 
-            onClick={() => { setReadingArticle(null); setSelectedCategory("ALL"); }}
-            className="flex items-center space-x-3 cursor-pointer group"
-          >
-            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-red-600 to-red-800 flex items-center justify-center font-black text-white text-base shadow-lg shadow-red-900/40 group-hover:scale-105 transition">
-              WP
-            </div>
-            <div>
-              <div className="flex items-center space-x-2">
-                <span className="font-extrabold text-lg sm:text-xl tracking-wider text-white">THE WIRE PULSE</span>
-                <span className="bg-red-900/60 border border-red-700/50 text-red-400 text-[9px] font-bold px-1.5 py-0.2 rounded uppercase">
-                  DISPATCH
-                </span>
-              </div>
-              <p className="text-[10px] text-gray-400 tracking-wide font-mono">
-                24/7 GLOBAL INTELLIGENCE & REALTIME TELETYPE NETWORK
-              </p>
-            </div>
-          </div>
-
-          {/* Search Bar */}
-          <div className="w-full md:w-80 relative">
-            <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Search global dispatches, topics, nations..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-[#121622] border border-gray-800 rounded-lg pl-9 pr-3 py-1.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-red-500 transition"
-            />
-          </div>
-
-          {/* Action Controls */}
+      {/* TOP COMMAND HEADER */}
+      <header className="bg-[#080b12] border-b border-gray-800/90 text-xs py-2 px-4 sm:px-8">
+        <div className="max-w-[1600px] mx-auto flex flex-col md:flex-row items-center justify-between gap-3">
+          {/* Logo & Operational Status */}
           <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-2">
+              <span className="relative flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-red-600"></span>
+              </span>
+              <span className="font-mono font-extrabold text-white text-sm tracking-wider">THE WIRE PULSE</span>
+              <span className="bg-red-950/80 border border-red-700/60 text-red-400 font-mono text-[9px] px-1.5 py-0.5 rounded uppercase font-bold">
+                TACTICAL TERMINAL v2.4
+              </span>
+            </div>
+            <span className="text-gray-600 hidden lg:inline">|</span>
+            <div className="hidden lg:flex items-center space-x-2 text-[11px] font-mono text-emerald-400">
+              <Activity className="w-3.5 h-3.5 animate-pulse" />
+              <span>SYS: OPERATIONAL // 4 WIRE AJANS VERIFIED</span>
+            </div>
+          </div>
+
+          {/* Multi-Timezone Operational Clocks */}
+          <div className="flex items-center space-x-4 font-mono text-[11px] text-gray-300 bg-[#0d121c] border border-gray-800 px-3 py-1 rounded">
+            <span className="text-red-400 font-bold">{utcTime}</span>
+            <span className="text-gray-600">•</span>
+            <span className="hidden sm:inline text-gray-400">{nycTime}</span>
+            <span className="hidden md:inline text-gray-600">•</span>
+            <span className="hidden md:inline text-gray-400">{ldnTime}</span>
+            <span className="hidden lg:inline text-gray-600">•</span>
+            <span className="hidden lg:inline text-gray-400">{tyoTime}</span>
+          </div>
+
+          {/* Action Bar */}
+          <div className="flex items-center space-x-3">
+            <button
+              onClick={() => {
+                setAudioEnabled(!audioEnabled);
+                showToast(audioEnabled ? "Audio teletype muted." : "Audio teletype initialized.");
+              }}
+              className={`flex items-center space-x-1.5 px-2.5 py-1 rounded border text-[11px] font-mono transition ${
+                audioEnabled
+                  ? "bg-red-950/80 border-red-600 text-red-300"
+                  : "bg-gray-900 border-gray-800 text-gray-400 hover:text-gray-200"
+              }`}
+            >
+              {audioEnabled ? <Volume2 className="w-3.5 h-3.5 text-red-400" /> : <VolumeX className="w-3.5 h-3.5" />}
+              <span>{audioEnabled ? "AUDIO ON" : "AUDIO MUTED"}</span>
+            </button>
+
             <button
               onClick={fetchNews}
               disabled={loading}
-              className="flex items-center space-x-1.5 text-xs bg-gray-800/80 hover:bg-gray-700 border border-gray-700 px-3 py-1.5 rounded-lg text-gray-200 transition"
+              className="flex items-center space-x-1.5 px-2.5 py-1 rounded bg-gray-900 hover:bg-gray-800 border border-gray-800 text-gray-300 text-[11px] font-mono transition"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin text-red-500" : ""}`} />
-              <span className="hidden sm:inline">Refresh Feeds</span>
+              <span className="hidden sm:inline">SYNC TELEMETRY</span>
             </button>
 
             <a
               href="https://www.instagram.com/thewirepulse/"
               target="_blank"
               rel="noreferrer"
-              className="flex items-center space-x-1.5 text-xs bg-red-600 hover:bg-red-700 text-white font-bold px-3.5 py-1.5 rounded-lg shadow-md shadow-red-600/30 transition"
+              className="flex items-center space-x-1.5 px-3 py-1 rounded bg-gradient-to-r from-red-600 to-rose-700 hover:from-red-500 hover:to-rose-600 text-white font-mono text-[11px] font-bold shadow-md shadow-red-900/30 transition"
             >
               <Instagram className="w-3.5 h-3.5" />
-              <span>Watch Reels</span>
+              <span>@thewirepulse</span>
             </a>
-          </div>
-        </div>
-
-        {/* NAVIGATION DESK TABS */}
-        <div className="border-t border-gray-800/60 bg-[#080b11]">
-          <div className="max-w-7xl mx-auto px-4 sm:px-8 flex items-center space-x-1 overflow-x-auto no-scrollbar py-2">
-            {CATEGORIES.map((cat) => {
-              const Icon = cat.icon;
-              const isActive = selectedCategory === cat.id;
-              return (
-                <button
-                  key={cat.id}
-                  onClick={() => {
-                    setSelectedCategory(cat.id);
-                    setReadingArticle(null);
-                  }}
-                  className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-md text-xs font-bold whitespace-nowrap transition ${
-                    isActive
-                      ? "bg-red-600 text-white shadow-md shadow-red-600/20"
-                      : "text-gray-400 hover:text-white hover:bg-gray-800/50"
-                  }`}
-                >
-                  <Icon className="w-3.5 h-3.5" />
-                  <span>{cat.label}</span>
-                </button>
-              );
-            })}
           </div>
         </div>
       </header>
 
-      {/* BODY CONTENT CONTAINER */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-8 py-6">
-        {/* VIEW A: FULL-PAGE ARTICLE READER */}
-        {readingArticle ? (
-          <div className="max-w-4xl mx-auto bg-[#10141f] border border-gray-800 rounded-2xl p-6 sm:p-10 shadow-2xl animate-fadeIn">
-            {/* Back Button */}
-            <button
-              onClick={() => setReadingArticle(null)}
-              className="inline-flex items-center space-x-2 text-xs font-bold text-gray-400 hover:text-red-400 mb-6 transition group"
-            >
-              <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition" />
-              <span>Back to Headline Carousel</span>
-            </button>
+      {/* BLOOMBERG DAYBREAK FINANCIAL & COMMODITY TICKER */}
+      <div className="bg-[#040609] border-b border-gray-800/80 py-1.5 px-4 overflow-hidden">
+        <div className="max-w-[1600px] mx-auto flex items-center">
+          <div className="flex items-center space-x-2 pr-4 shrink-0 border-r border-gray-800 font-mono text-[10px] text-gray-400">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span className="font-bold text-gray-300">GLOBAL MARKETS:</span>
+          </div>
+          <div className="overflow-hidden whitespace-nowrap flex-1 ml-4">
+            <div className="inline-block animate-marquee font-mono text-[11px]">
+              {FINANCIAL_TICKER.map((item, idx) => (
+                <span key={idx} className="mx-4 inline-flex items-center space-x-1.5">
+                  <span className="text-gray-400 font-bold">{item.symbol}</span>
+                  <span className="text-white">{item.price}</span>
+                  <span className={`font-semibold ${item.isUp ? "text-emerald-400" : "text-red-400"}`}>
+                    {item.change}
+                  </span>
+                  <span className="text-gray-700 ml-3">|</span>
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
 
-            {/* Meta Pill Bar */}
-            <div className="flex flex-wrap items-center gap-3 text-xs text-gray-400 font-mono mb-4">
-              <span className="bg-red-600 text-white font-extrabold px-2.5 py-0.5 rounded text-[11px] uppercase tracking-wider">
+      {/* 3-COLUMN TACTICAL COMMAND GRID */}
+      <main className="max-w-[1600px] w-full mx-auto px-4 sm:px-6 py-5 flex-1">
+        {/* DOSSIER READER MODAL */}
+        {readingArticle ? (
+          <div className="bg-[#0b0f19] border border-gray-800 rounded-xl p-6 sm:p-10 shadow-2xl animate-fadeIn max-w-4xl mx-auto mb-8">
+            <div className="flex items-center justify-between border-b border-gray-800 pb-4 mb-6">
+              <button
+                onClick={() => setReadingArticle(null)}
+                className="inline-flex items-center space-x-2 text-xs font-mono font-bold text-red-400 hover:text-red-300 transition"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>RETURN TO TACTICAL THEATER</span>
+              </button>
+              <div className="flex items-center space-x-2 font-mono text-[10px] bg-red-950/60 border border-red-800/60 text-red-300 px-2.5 py-1 rounded">
+                <FileText className="w-3.5 h-3.5" />
+                <span>DECLASSIFIED WIRE DOSSIER</span>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3 font-mono text-xs text-gray-400 mb-4">
+              <span className="bg-red-600 text-white font-extrabold px-2.5 py-0.5 rounded text-[11px] uppercase">
                 {readingArticle.category}
               </span>
               <span>•</span>
-              <span className="text-gray-300 font-semibold">{readingArticle.source}</span>
+              <span className="text-gray-200 font-bold">{readingArticle.source}</span>
+              <span>•</span>
+              <span>{readingArticle.desk}</span>
               <span>•</span>
               <span>{readingArticle.timeAgo}</span>
-              <span>•</span>
-              <span>{readingArticle.readTime}</span>
             </div>
 
-            {/* Headline */}
-            <h1 className="text-2xl sm:text-4xl font-extrabold text-white leading-tight mb-6">
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-white leading-tight mb-6">
               {readingArticle.title}
             </h1>
 
-            {/* Hero Image */}
-            <div className="relative aspect-video w-full rounded-xl overflow-hidden mb-8 border border-gray-800 shadow-2xl bg-black">
+            {/* Broadcast Photo Container */}
+            <div className="relative aspect-video w-full rounded-lg overflow-hidden mb-6 border border-gray-800 bg-black">
               <img
                 src={readingArticle.imageUrl}
                 alt={readingArticle.title}
                 className="w-full h-full object-cover"
               />
-              <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent p-4 text-xs text-gray-300">
-                <span>Photo: {readingArticle.desk} Archive / International News Agency Distribution</span>
+              <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/90 p-3 text-[11px] text-gray-300 font-mono">
+                WIRE DISPATCH TELEMETRY // {readingArticle.desk}
               </div>
             </div>
 
-            {/* Article Text & Key Context */}
-            <div className="space-y-6 text-gray-200 text-base sm:text-lg leading-relaxed">
-              <div className="p-4 bg-red-950/20 border-l-4 border-red-600 rounded-r text-gray-100 font-medium">
-                {readingArticle.summary}
+            <div className="space-y-4 text-gray-300 text-base leading-relaxed font-sans mb-8">
+              <p>{readingArticle.summary}</p>
+              <div className="bg-[#101625] border-l-4 border-red-600 p-4 rounded-r font-mono text-xs text-gray-300 space-y-1">
+                <div className="font-bold text-red-400 uppercase tracking-wider mb-1">KEY STRATEGIC IMPLICATIONS</div>
+                <div>• Verified across multi-bureau intelligence wire network.</div>
+                <div>• Ongoing operational monitoring active on The Wire Pulse dispatch desk.</div>
+                <div>• Source consensus match rating: 99.4% confirmation.</div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-4 border-t border-gray-800">
+              <div className="flex items-center space-x-3">
+                <button
+                  onClick={(e) => toggleBookmark(readingArticle.id, e)}
+                  className="flex items-center space-x-1.5 px-3 py-1.5 rounded bg-gray-900 border border-gray-700 text-xs font-mono text-gray-300 hover:text-white"
+                >
+                  <Bookmark className={`w-3.5 h-3.5 ${savedIds.has(readingArticle.id) ? "fill-red-500 text-red-500" : ""}`} />
+                  <span>{savedIds.has(readingArticle.id) ? "SAVED" : "SAVE DOSSIER"}</span>
+                </button>
+                <button
+                  onClick={(e) => shareDispatch(readingArticle, e)}
+                  className="flex items-center space-x-1.5 px-3 py-1.5 rounded bg-gray-900 border border-gray-700 text-xs font-mono text-gray-300 hover:text-white"
+                >
+                  <Share2 className="w-3.5 h-3.5" />
+                  <span>SHARE</span>
+                </button>
               </div>
 
-              <p>
-                International wire networks and field correspondents indicate that key diplomatic and operational personnel were mobilized swiftly as official inquiries continue. Regional observers evaluate these developments as a critical inflection point for multilateral stability.
-              </p>
+              <a
+                href={readingArticle.url}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center space-x-2 px-4 py-2 rounded bg-red-600 hover:bg-red-500 text-white font-mono text-xs font-bold transition shadow-lg shadow-red-900/30"
+              >
+                <span>OPEN OFFICIAL SOURCE</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            </div>
+          </div>
+        ) : null}
 
-              <p>
-                Independent security analysts and market strategists note that the diplomatic aftermath is expected to exert prolonged influence across cross-border trade, regulatory frameworks, and defense alignments.
-              </p>
+        {/* 3-COLUMN LAYOUT */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+          {/* COLUMN 1: RADAR & DESK CONTROLS (3 Cols on 12-col grid) */}
+          <div className="lg:col-span-3 space-y-4">
+            {/* GEOPOLITICAL RADAR WIDGET */}
+            <div className="bg-[#090d16] border border-gray-800/90 rounded-xl p-4 shadow-xl">
+              <div className="flex items-center justify-between pb-3 border-b border-gray-800/70 mb-3">
+                <div className="flex items-center space-x-2">
+                  <Crosshair className="w-4 h-4 text-red-500" />
+                  <span className="font-mono text-xs font-bold text-gray-200">TACTICAL RADAR</span>
+                </div>
+                <span className="font-mono text-[10px] text-red-400 bg-red-950/60 border border-red-800/50 px-2 py-0.5 rounded">
+                  SCANNING
+                </span>
+              </div>
 
-              {/* Wire Source Link */}
-              <div className="pt-6 border-t border-gray-800 flex flex-col sm:flex-row items-center justify-between gap-4">
-                <div className="text-xs text-gray-400 font-mono">
-                  Verified Wire Source: <b className="text-white">{readingArticle.desk}</b>
+              {/* Radar Graphic */}
+              <div className="relative w-full aspect-square max-w-[210px] mx-auto rounded-full border border-gray-800 bg-[#05080e] overflow-hidden flex items-center justify-center mb-4">
+                {/* Concentric rings */}
+                <div className="absolute inset-3 rounded-full border border-dashed border-gray-800"></div>
+                <div className="absolute inset-8 rounded-full border border-gray-800"></div>
+                <div className="absolute inset-14 rounded-full border border-gray-800/60"></div>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-full h-[1px] bg-gray-800"></div>
+                </div>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="h-full w-[1px] bg-gray-800"></div>
                 </div>
 
-                <a
-                  href={readingArticle.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="w-full sm:w-auto inline-flex items-center justify-center space-x-2 bg-red-600 hover:bg-red-700 text-white font-bold px-6 py-3 rounded-lg shadow-lg shadow-red-600/30 transition text-sm"
-                >
-                  <span>View Original Wire Dispatch</span>
-                  <ExternalLink className="w-4 h-4" />
-                </a>
-              </div>
-            </div>
+                {/* Radar Sweep Line */}
+                <div className="absolute inset-0 animate-radar pointer-events-none">
+                  <div className="w-1/2 h-1/2 bg-gradient-to-br from-red-600/30 to-transparent origin-bottom-right"></div>
+                </div>
 
-            {/* Related Dispatches */}
-            <div className="mt-12 pt-8 border-t border-gray-800">
-              <h3 className="text-base font-bold text-white uppercase tracking-wider flex items-center space-x-2 mb-4">
-                <Flame className="w-4 h-4 text-red-500" />
-                <span>Related Breaking Dispatches</span>
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                {articles.filter((a) => a.id !== readingArticle.id).slice(0, 3).map((rel) => (
-                  <div
-                    key={`rel-${rel.id}`}
-                    onClick={() => {
-                      setReadingArticle(rel);
-                      window.scrollTo({ top: 0, behavior: "smooth" });
-                    }}
-                    className="bg-[#1a202c] border border-gray-800 rounded-lg p-3 hover:border-red-500 cursor-pointer transition group"
-                  >
-                    <div className="aspect-video w-full rounded overflow-hidden mb-2 bg-black">
-                      <img src={rel.imageUrl} alt={rel.title} className="w-full h-full object-cover group-hover:scale-105 transition" />
+                {/* Hotspot Blips */}
+                <div className="absolute top-10 left-12 w-2 h-2 rounded-full bg-red-500 animate-ping"></div>
+                <div className="absolute top-10 left-12 w-2 h-2 rounded-full bg-red-500"></div>
+
+                <div className="absolute bottom-12 right-14 w-2 h-2 rounded-full bg-amber-400 animate-ping"></div>
+                <div className="absolute bottom-12 right-14 w-2 h-2 rounded-full bg-amber-400"></div>
+
+                <div className="absolute top-16 right-10 w-1.5 h-1.5 rounded-full bg-cyan-400"></div>
+
+                <span className="text-[9px] font-mono text-gray-500 z-10">THE WIRE PULSE RADAR</span>
+              </div>
+
+              {/* Hotspot List */}
+              <div className="space-y-2 font-mono text-[11px]">
+                {HOTSPOT_TELEMETRY.map((spot, idx) => (
+                  <div key={idx} className="flex items-center justify-between p-1.5 rounded bg-[#0d121e] border border-gray-800/60">
+                    <div className="flex items-center space-x-1.5 truncate">
+                      <span className={`w-1.5 h-1.5 rounded-full ${spot.level === "RED" ? "bg-red-500" : "bg-amber-400"}`}></span>
+                      <span className="text-gray-300 font-semibold truncate">{spot.name}</span>
                     </div>
-                    <span className="text-[10px] text-red-500 font-bold uppercase">{rel.category}</span>
-                    <h4 className="text-xs font-bold text-gray-100 group-hover:text-red-400 line-clamp-2 mt-1">
-                      {rel.title}
-                    </h4>
+                    <span className="text-[10px] text-gray-400 shrink-0 ml-1">{spot.status}</span>
                   </div>
                 ))}
               </div>
             </div>
-          </div>
-        ) : (
-          /* VIEW B: MAIN BROADCAST DASHBOARD */
-          <div className="space-y-10">
-            {/* 1-10 HEADLINE SLIDER + REALTIME STREAM ROW */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-              {/* LEFT 8 COLS: 1-10 HEADLINE CAROUSEL */}
-              <div className="lg:col-span-8 bg-[#121622] border border-gray-800 rounded-xl overflow-hidden shadow-2xl flex flex-col">
-                {activeHeadline ? (
-                  <div 
-                    className="relative aspect-[16/10] sm:aspect-[16/9] w-full overflow-hidden group cursor-pointer bg-black"
-                    onClick={() => setReadingArticle(activeHeadline)}
-                  >
-                    <img
-                      src={activeHeadline.imageUrl}
-                      alt={activeHeadline.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition duration-700 ease-out"
-                    />
 
-                    {/* Gradient Overlay */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent"></div>
-
-                    {/* Top Badges */}
-                    <div className="absolute top-4 left-4 flex items-center space-x-2">
-                      <span className="bg-red-600 text-white font-black text-xs px-3 py-1 rounded shadow-lg uppercase tracking-wider flex items-center">
-                        <Flame className="w-3.5 h-3.5 mr-1" />
-                        TOP STORY {currentHeadlineIndex + 1}
-                      </span>
-                      <span className="bg-black/60 backdrop-blur-md text-gray-300 font-mono text-xs px-2.5 py-1 rounded border border-gray-700">
-                        {activeHeadline.source}
-                      </span>
-                    </div>
-
-                    {/* Bottom Metadata & Title */}
-                    <div className="absolute bottom-0 inset-x-0 p-5 sm:p-8">
-                      <div className="flex items-center space-x-3 text-xs text-gray-300 mb-2 font-mono">
-                        <span className="text-red-400 font-bold uppercase">{activeHeadline.category}</span>
-                        <span>•</span>
-                        <span>{activeHeadline.timeAgo}</span>
-                      </div>
-
-                      <h2 className="text-xl sm:text-3xl font-extrabold text-white leading-tight group-hover:text-red-400 transition mb-3 line-clamp-3">
-                        {activeHeadline.title}
-                      </h2>
-
-                      <p className="text-xs sm:text-sm text-gray-300 line-clamp-2 font-normal hidden sm:block">
-                        {activeHeadline.summary}
-                      </p>
-
-                      <div className="mt-4 flex items-center space-x-4">
-                        <span className="inline-flex items-center text-xs font-bold bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded transition shadow">
-                          Read Full Dispatch →
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Prev / Next Arrows */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setCurrentHeadlineIndex((prev) => (prev - 1 + headlineList.length) % headlineList.length);
-                      }}
-                      className="absolute left-3 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-red-600 text-white p-2 rounded-full transition border border-gray-700 opacity-0 group-hover:opacity-100"
-                    >
-                      <ChevronLeft className="w-5 h-5" />
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setCurrentHeadlineIndex((prev) => (prev + 1) % headlineList.length);
-                      }}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-red-600 text-white p-2 rounded-full transition border border-gray-700 opacity-0 group-hover:opacity-100"
-                    >
-                      <ChevronRight className="w-5 h-5" />
-                    </button>
-                  </div>
-                ) : (
-                  <div className="aspect-video flex items-center justify-center text-gray-500 font-mono text-sm">
-                    Connecting to international wire feeds...
-                  </div>
-                )}
-
-                {/* 1-10 NUMBERED PAGINATION BAR */}
-                <div className="bg-[#0b0e14] border-t border-gray-800 p-2 sm:p-3 flex items-center justify-between gap-1 overflow-x-auto no-scrollbar">
-                  <div className="flex items-center space-x-1 sm:space-x-1.5 flex-1 justify-center">
-                    {headlineList.map((_, idx) => (
-                      <button
-                        key={`num-btn-${idx}`}
-                        onClick={() => setCurrentHeadlineIndex(idx)}
-                        className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg font-mono font-bold text-xs sm:text-sm flex items-center justify-center transition ${
-                          currentHeadlineIndex === idx
-                            ? "bg-red-600 text-white shadow-lg shadow-red-600/40 scale-105"
-                            : "bg-[#181d2a] text-gray-400 hover:text-white hover:bg-gray-800"
-                        }`}
-                      >
-                        {idx + 1}
-                      </button>
-                    ))}
-                  </div>
-
-                  <button
-                    onClick={() => setIsAutoPlay(!isAutoPlay)}
-                    className="text-[10px] text-gray-400 hover:text-white px-2 py-1 bg-gray-800/60 rounded border border-gray-700 font-mono shrink-0 ml-2"
-                  >
-                    {isAutoPlay ? "Pause Auto" : "Play Auto"}
-                  </button>
-                </div>
+            {/* DESK CHANNEL SELECTOR */}
+            <div className="bg-[#090d16] border border-gray-800/90 rounded-xl p-4 shadow-xl">
+              <div className="font-mono text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">
+                INTELLIGENCE DESKS
               </div>
-
-              {/* RIGHT 4 COLS: REALTIME WIRE STREAM */}
-              <div className="lg:col-span-4 bg-[#121622] border border-gray-800 rounded-xl overflow-hidden shadow-2xl flex flex-col h-[520px] sm:h-[590px]">
-                {/* Header */}
-                <div className="bg-[#0e121b] border-b border-gray-800 px-4 py-3 flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping"></span>
-                    <h3 className="font-extrabold text-xs sm:text-sm tracking-wide text-white uppercase">
-                      REALTIME WIRE STREAM
-                    </h3>
-                  </div>
-                  <span className="text-[10px] text-gray-400 font-mono uppercase">LIVE FEED</span>
-                </div>
-
-                {/* Stream Item List */}
-                <div className="flex-1 overflow-y-auto divide-y divide-gray-800/80 custom-scrollbar p-1">
-                  {realtimeStream.map((art, idx) => (
-                    <div
-                      key={`stream-${art.id}-${idx}`}
-                      onClick={() => setReadingArticle(art)}
-                      className="p-3 hover:bg-[#1c2230] cursor-pointer transition group"
+              <div className="space-y-1">
+                {TACTICAL_DESKS.map((desk) => {
+                  const Icon = desk.icon;
+                  const isActive = selectedDesk === desk.id;
+                  return (
+                    <button
+                      key={desk.id}
+                      onClick={() => {
+                        setSelectedDesk(desk.id);
+                        setReadingArticle(null);
+                      }}
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-mono transition ${
+                        isActive
+                          ? "bg-red-600 text-white font-bold shadow-lg shadow-red-900/40"
+                          : "text-gray-300 hover:bg-[#111726] hover:text-white"
+                      }`}
                     >
-                      <div className="flex items-start space-x-3">
-                        <div className="shrink-0 text-center">
-                          <span className="inline-block bg-red-950/60 border border-red-800/50 text-red-400 font-mono text-[11px] font-bold px-1.5 py-0.5 rounded">
-                            {art.timeAgo}
-                          </span>
-                        </div>
-
-                        <div className="flex-1 min-w-0">
-                          <span className="text-[10px] text-gray-400 font-semibold uppercase">
-                            {art.source} • <span className="text-red-400">{art.category}</span>
-                          </span>
-                          <h4 className="text-xs sm:text-sm font-bold text-gray-200 group-hover:text-red-400 transition line-clamp-2 leading-snug mt-0.5">
-                            {art.title}
-                          </h4>
-                        </div>
+                      <div className="flex items-center space-x-2">
+                        <Icon className="w-3.5 h-3.5" />
+                        <span>{desk.label}</span>
                       </div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Footer status */}
-                <div className="bg-[#0b0e14] px-4 py-2 text-[11px] text-gray-400 border-t border-gray-800 flex items-center justify-between">
-                  <span>{articles.length} Verified Dispatches</span>
-                  <span className="text-emerald-400 font-mono">● Auto-Sync Active</span>
-                </div>
+                      <span className={`text-[10px] ${isActive ? "text-red-200" : "text-gray-500"}`}>
+                        {desk.code}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
-            {/* 4-COLUMN TOP DEVELOPMENTS GRID */}
-            <div className="space-y-4">
-              <div className="flex items-center space-x-2 border-b-2 border-red-600 pb-2">
-                <Flame className="w-5 h-5 text-red-600" />
-                <h3 className="text-lg font-black uppercase tracking-wider text-white">
-                  TOP DEVELOPMENTS & HIGHLIGHTS
-                </h3>
+            {/* SEARCH WIRE */}
+            <div className="bg-[#090d16] border border-gray-800/90 rounded-xl p-3 shadow-xl">
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Filter tactical dispatches..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full bg-[#0d121f] border border-gray-800 rounded-lg pl-8 pr-3 py-1.5 text-xs font-mono text-white placeholder-gray-500 focus:outline-none focus:border-red-500"
+                />
               </div>
+            </div>
+          </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {topDevelopments.map((art) => (
-                  <div
-                    key={`top-${art.id}`}
-                    onClick={() => setReadingArticle(art)}
-                    className="bg-[#121622] border border-gray-800 hover:border-red-600 rounded-xl overflow-hidden shadow-lg hover:shadow-red-900/20 cursor-pointer transition group flex flex-col"
+          {/* COLUMN 2: MAIN THEATER (HERO CAROUSEL & BRIEFINGS) (6 Cols on 12-col grid) */}
+          <div className="lg:col-span-6 space-y-5">
+            {/* HERO CAROUSEL 1-10 SLIDER */}
+            {activeHeadline && (
+              <div className="bg-[#090d16] border border-gray-800/90 rounded-xl overflow-hidden shadow-2xl">
+                {/* Carousel Top Telemetry Bar */}
+                <div className="bg-[#0d121f] border-b border-gray-800 px-4 py-2 flex items-center justify-between text-xs font-mono">
+                  <div className="flex items-center space-x-2">
+                    <span className="bg-red-600 text-white px-2 py-0.5 rounded font-extrabold text-[10px]">
+                      DISPATCH {currentSlideIndex + 1} / 10
+                    </span>
+                    <span className="text-gray-400 hidden sm:inline">•</span>
+                    <span className="text-gray-300 font-semibold hidden sm:inline">{activeHeadline.desk}</span>
+                  </div>
+
+                  {/* Play / Pause Toggle */}
+                  <button
+                    onClick={() => setIsAutoPlay(!isAutoPlay)}
+                    className="flex items-center space-x-1 text-gray-400 hover:text-white transition text-[11px]"
                   >
-                    <div className="relative aspect-[16/10] w-full overflow-hidden bg-black">
+                    {isAutoPlay ? <Pause className="w-3 h-3 text-red-400" /> : <Play className="w-3 h-3 text-emerald-400" />}
+                    <span>{isAutoPlay ? "AUTO-CYCLE ACTIVE" : "PAUSED"}</span>
+                  </button>
+                </div>
+
+                {/* Hero Media Frame with Ambient Backdrop */}
+                <div className="relative aspect-video w-full bg-black overflow-hidden group cursor-pointer" onClick={() => setReadingArticle(activeHeadline)}>
+                  {/* Ambient blurred backdrop for 16:9 ratio preservation */}
+                  <div
+                    className="absolute inset-0 bg-cover bg-center filter blur-2xl opacity-40 scale-110"
+                    style={{ backgroundImage: `url(${activeHeadline.imageUrl})` }}
+                  ></div>
+
+                  {/* Sharp Front Image */}
+                  <img
+                    src={activeHeadline.imageUrl}
+                    alt={activeHeadline.title}
+                    className="relative z-10 w-full h-full object-cover group-hover:scale-102 transition duration-500"
+                  />
+
+                  {/* Vignette Overlay */}
+                  <div className="absolute inset-0 z-20 bg-gradient-to-t from-[#090d16] via-[#090d16]/30 to-transparent"></div>
+
+                  {/* Overlay Badges */}
+                  <div className="absolute top-4 left-4 z-30 flex items-center space-x-2">
+                    <span className="bg-red-600 text-white font-mono text-[10px] font-extrabold px-2 py-0.5 rounded shadow">
+                      {activeHeadline.category}
+                    </span>
+                    <span className="bg-black/70 backdrop-blur border border-gray-700 font-mono text-[10px] text-gray-300 px-2 py-0.5 rounded">
+                      {activeHeadline.source}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Headline & Structured Intelligence Anatomy */}
+                <div className="p-5 space-y-4">
+                  <h2 
+                    onClick={() => setReadingArticle(activeHeadline)}
+                    className="text-xl sm:text-2xl font-extrabold text-white leading-tight cursor-pointer hover:text-red-400 transition"
+                  >
+                    {activeHeadline.title}
+                  </h2>
+
+                  {/* Semafor-Style Smart Brevity Callout */}
+                  <div className="bg-[#0d121f] border-l-2 border-red-500 p-3 rounded-r text-xs text-gray-300 space-y-2">
+                    <div className="font-mono text-[10px] font-bold text-red-400 uppercase tracking-wider">
+                      RAW WIRE SITUATION REPORT:
+                    </div>
+                    <p className="leading-relaxed line-clamp-3">
+                      {activeHeadline.summary}
+                    </p>
+                  </div>
+
+                  {/* Interactive 1-10 Slider Pagers */}
+                  <div className="pt-2 border-t border-gray-800 flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center space-x-1.5 overflow-x-auto no-scrollbar">
+                      {carouselHeadlines.map((_, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => {
+                            setCurrentSlideIndex(idx);
+                            playTeletypeBlip();
+                          }}
+                          className={`w-7 h-7 rounded text-xs font-mono font-bold transition ${
+                            currentSlideIndex === idx
+                              ? "bg-red-600 text-white shadow-lg shadow-red-900/40"
+                              : "bg-[#0d121f] text-gray-400 hover:text-white hover:bg-gray-800"
+                          }`}
+                        >
+                          {idx + 1}
+                        </button>
+                      ))}
+                    </div>
+
+                    <button
+                      onClick={() => setReadingArticle(activeHeadline)}
+                      className="px-3.5 py-1.5 rounded bg-red-600 hover:bg-red-500 text-white font-mono text-xs font-bold transition flex items-center space-x-1.5 shadow"
+                    >
+                      <span>READ FULL DOSSIER</span>
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* SECONDARY TACTICAL DISPATCHES (Stories 11-14) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {articles.slice(10, 14).map((art) => (
+                <div
+                  key={art.id}
+                  onClick={() => setReadingArticle(art)}
+                  className="bg-[#090d16] border border-gray-800/80 hover:border-red-600/70 rounded-xl p-3.5 transition group cursor-pointer shadow-lg flex flex-col justify-between"
+                >
+                  <div className="space-y-2.5">
+                    <div className="relative aspect-video w-full rounded-lg overflow-hidden bg-black">
                       <img
                         src={art.imageUrl}
                         alt={art.title}
-                        className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+                        className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
                       />
-                      <span className="absolute top-2 left-2 bg-red-600 text-white font-extrabold text-[10px] px-2 py-0.5 rounded uppercase tracking-wider">
+                      <span className="absolute top-2 left-2 bg-red-950/80 border border-red-700/60 text-red-300 font-mono text-[9px] px-1.5 py-0.5 rounded font-bold uppercase">
                         {art.category}
                       </span>
                     </div>
 
-                    <div className="p-4 flex-1 flex flex-col justify-between">
-                      <div>
-                        <div className="flex items-center justify-between text-[11px] text-gray-400 font-mono mb-2">
-                          <span>{art.source}</span>
-                          <span>{art.timeAgo}</span>
-                        </div>
-                        <h4 className="text-sm font-bold text-white group-hover:text-red-400 transition line-clamp-3 leading-snug">
-                          {art.title}
-                        </h4>
-                      </div>
+                    <div className="flex items-center space-x-2 text-[10px] font-mono text-gray-400">
+                      <span>{art.source}</span>
+                      <span>•</span>
+                      <span>{art.timeAgo}</span>
+                    </div>
 
-                      <div className="mt-3 pt-3 border-t border-gray-800/80 flex items-center justify-between text-xs text-gray-400">
-                        <span className="text-red-500 font-semibold group-hover:underline">Read Dispatch →</span>
-                        <div className="flex items-center space-x-2">
-                          <button
-                            onClick={(e) => toggleBookmark(art.id, e)}
-                            className="p-1 hover:text-white"
-                          >
-                            <Bookmark className={`w-3.5 h-3.5 ${savedIds.has(art.id) ? "text-amber-400 fill-amber-400" : ""}`} />
-                          </button>
-                        </div>
+                    <h3 className="text-xs font-bold text-gray-200 group-hover:text-red-400 line-clamp-2 leading-snug">
+                      {art.title}
+                    </h3>
+                  </div>
+
+                  <div className="pt-2 mt-2 border-t border-gray-800/80 flex items-center justify-between text-[10px] font-mono text-gray-500">
+                    <span>{art.readTime}</span>
+                    <span className="text-red-400 group-hover:underline">VIEW &rarr;</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* COLUMN 3: 24/7 RAPID TELETYPE WIRE STREAM (3 Cols on 12-col grid) */}
+          <div className="lg:col-span-3">
+            <div className="bg-[#090d16] border border-gray-800/90 rounded-xl p-4 shadow-2xl flex flex-col h-[780px]">
+              {/* Wire Header */}
+              <div className="flex items-center justify-between pb-3 border-b border-gray-800 mb-3 shrink-0">
+                <div className="flex items-center space-x-2">
+                  <Radio className="w-4 h-4 text-red-500 animate-pulse" />
+                  <span className="font-mono text-xs font-bold text-white tracking-wider">24/7 RAPID WIRE</span>
+                </div>
+                <span className="font-mono text-[10px] text-emerald-400 bg-emerald-950/60 border border-emerald-800/50 px-2 py-0.5 rounded">
+                  LIVE STREAM
+                </span>
+              </div>
+
+              {/* Scrolling Wire Stream */}
+              <div className="overflow-y-auto space-y-2.5 custom-scrollbar pr-1 flex-1">
+                {filteredArticles.map((art, idx) => (
+                  <div
+                    key={art.id || idx}
+                    onClick={() => setReadingArticle(art)}
+                    className="p-2.5 rounded-lg bg-[#0d121f] border border-gray-800/80 hover:border-red-600/80 transition cursor-pointer group"
+                  >
+                    {/* Timestamp & Urgency */}
+                    <div className="flex items-center justify-between text-[10px] font-mono text-gray-400 mb-1.5">
+                      <div className="flex items-center space-x-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>
+                        <span className="text-red-400 font-bold">{art.timeAgo}</span>
                       </div>
+                      <span className="text-gray-500 truncate max-w-[100px]">{art.source}</span>
+                    </div>
+
+                    {/* Headline */}
+                    <p className="text-xs font-semibold text-gray-200 group-hover:text-red-400 leading-snug line-clamp-2">
+                      {art.title}
+                    </p>
+
+                    {/* Desk Badge */}
+                    <div className="mt-2 flex items-center justify-between text-[9px] font-mono text-gray-500">
+                      <span className="text-gray-400 uppercase">{art.category}</span>
+                      <span className="group-hover:text-red-400">&rarr; DOSSIER</span>
                     </div>
                   </div>
                 ))}
               </div>
             </div>
-
-            {/* 3-COLUMN REGIONAL & EDITORIAL DESKS */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* WORLD AFFAIRS */}
-              <div className="bg-[#121622] border border-gray-800 rounded-xl p-5 shadow-lg space-y-4">
-                <div className="flex items-center justify-between border-b-2 border-blue-600 pb-2">
-                  <div className="flex items-center space-x-2">
-                    <Globe2 className="w-4 h-4 text-blue-500" />
-                    <h3 className="font-black text-sm uppercase text-white tracking-wide">WORLD AFFAIRS & DIPLOMACY</h3>
-                  </div>
-                  <span className="text-[10px] text-gray-400 font-mono">GLOBAL DESK</span>
-                </div>
-
-                <div className="space-y-3">
-                  {worldDispatches.map((art) => (
-                    <div
-                      key={`world-${art.id}`}
-                      onClick={() => setReadingArticle(art)}
-                      className="flex items-start space-x-3 p-2 rounded hover:bg-gray-800/50 cursor-pointer transition group"
-                    >
-                      <img src={art.imageUrl} alt={art.title} className="w-16 h-16 rounded object-cover shrink-0 bg-black" />
-                      <div className="min-w-0">
-                        <span className="text-[10px] text-blue-400 font-bold uppercase">{art.source}</span>
-                        <h4 className="text-xs font-bold text-gray-200 group-hover:text-blue-400 line-clamp-2 leading-snug">
-                          {art.title}
-                        </h4>
-                        <span className="text-[10px] text-gray-500">{art.timeAgo}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* GLOBAL MARKETS */}
-              <div className="bg-[#121622] border border-gray-800 rounded-xl p-5 shadow-lg space-y-4">
-                <div className="flex items-center justify-between border-b-2 border-emerald-600 pb-2">
-                  <div className="flex items-center space-x-2">
-                    <TrendingUp className="w-4 h-4 text-emerald-500" />
-                    <h3 className="font-black text-sm uppercase text-white tracking-wide">GLOBAL MARKETS & TRADE</h3>
-                  </div>
-                  <span className="text-[10px] text-gray-400 font-mono">FINANCIAL WIRE</span>
-                </div>
-
-                <div className="space-y-3">
-                  {marketDispatches.map((art) => (
-                    <div
-                      key={`markets-${art.id}`}
-                      onClick={() => setReadingArticle(art)}
-                      className="flex items-start space-x-3 p-2 rounded hover:bg-gray-800/50 cursor-pointer transition group"
-                    >
-                      <img src={art.imageUrl} alt={art.title} className="w-16 h-16 rounded object-cover shrink-0 bg-black" />
-                      <div className="min-w-0">
-                        <span className="text-[10px] text-emerald-400 font-bold uppercase">{art.source}</span>
-                        <h4 className="text-xs font-bold text-gray-200 group-hover:text-emerald-400 line-clamp-2 leading-snug">
-                          {art.title}
-                        </h4>
-                        <span className="text-[10px] text-gray-500">{art.timeAgo}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* WAR & DEFENSE */}
-              <div className="bg-[#121622] border border-gray-800 rounded-xl p-5 shadow-lg space-y-4">
-                <div className="flex items-center justify-between border-b-2 border-red-600 pb-2">
-                  <div className="flex items-center space-x-2">
-                    <ShieldAlert className="w-4 h-4 text-red-500" />
-                    <h3 className="font-black text-sm uppercase text-white tracking-wide">DEFENSE & CONFLICT</h3>
-                  </div>
-                  <span className="text-[10px] text-gray-400 font-mono">SECURITY WIRE</span>
-                </div>
-
-                <div className="space-y-3">
-                  {defenseDispatches.map((art) => (
-                    <div
-                      key={`defense-${art.id}`}
-                      onClick={() => setReadingArticle(art)}
-                      className="flex items-start space-x-3 p-2 rounded hover:bg-gray-800/50 cursor-pointer transition group"
-                    >
-                      <img src={art.imageUrl} alt={art.title} className="w-16 h-16 rounded object-cover shrink-0 bg-black" />
-                      <div className="min-w-0">
-                        <span className="text-[10px] text-red-400 font-bold uppercase">{art.source}</span>
-                        <h4 className="text-xs font-bold text-gray-200 group-hover:text-red-400 line-clamp-2 leading-snug">
-                          {art.title}
-                        </h4>
-                        <span className="text-[10px] text-gray-500">{art.timeAgo}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
           </div>
-        )}
+        </div>
       </main>
 
       {/* FOOTER */}
-      <footer className="bg-[#080a0f] border-t border-gray-800 py-8 px-4 sm:px-8 mt-12 text-xs text-gray-400">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+      <footer className="bg-[#05070c] border-t border-gray-800/80 py-4 px-4 sm:px-8 mt-10 text-xs font-mono text-gray-400">
+        <div className="max-w-[1600px] mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center space-x-3">
-            <div className="w-7 h-7 rounded bg-red-600 flex items-center justify-center font-black text-white text-xs">
+            <div className="w-6 h-6 rounded bg-red-600 flex items-center justify-center font-black text-white text-xs">
               WP
             </div>
             <div>
-              <span className="font-bold text-white tracking-wider">THE WIRE PULSE</span>
-              <p className="text-[11px] text-gray-500">
-                Independent 24/7 Global Intelligence & Real-Time Wire Network.
-              </p>
+              <span className="font-bold text-white tracking-wider">THE WIRE PULSE // TACTICAL NETWORK</span>
+              <p className="text-[10px] text-gray-500">Encrypted 24/7 Global Intelligence Wire & Defense Radar.</p>
             </div>
           </div>
 
           <div className="flex items-center space-x-6 text-[11px]">
-            <span>Verified Feeds: Reuters, BBC News, DW, France 24, Al Jazeera</span>
+            <span>WIRE SOURCES: REUTERS • BBC • DW • AFP • AL JAZEERA</span>
             <a
               href="https://www.instagram.com/thewirepulse/"
               target="_blank"
               rel="noreferrer"
-              className="text-pink-400 hover:text-pink-300 font-semibold"
+              className="text-red-400 hover:text-red-300 font-bold"
             >
-              Instagram @thewirepulse
+              @thewirepulse
             </a>
           </div>
         </div>
